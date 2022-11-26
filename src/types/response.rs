@@ -46,7 +46,10 @@ pub struct GetAttributes {
     #[serde(rename = "s")]
     pub size: u64,
 
-    pub at: String,
+    /// Encoded attributes
+    #[serde(rename = "at")]
+    pub encoded_attributes: String,
+
     pub msd: u8,
 
     /// The download url
