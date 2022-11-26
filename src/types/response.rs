@@ -1,4 +1,9 @@
+use cbc::cipher::BlockDecryptMut;
+use cbc::cipher::KeyIvInit;
+use std::collections::HashMap;
 use url::Url;
+
+type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
 
 /// An api response
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -39,6 +44,42 @@ pub enum ResponseData {
     GetAttributes(GetAttributes),
 }
 
+/// An error that may occur while decoding attributes
+#[derive(Debug, thiserror::Error)]
+pub enum DecodeAttributesError {
+    /// Failed to decode base64
+    #[error(transparent)]
+    Base64Decode(#[from] base64::DecodeError),
+
+    /// Decryption failed
+    #[error("failed to decrypt")]
+    Decrypt(block_padding::UnpadError),
+
+    /// Invalid utf8
+    #[error(transparent)]
+    InvalidUtf8(#[from] std::str::Utf8Error),
+
+    /// Missing the MEGA prefix
+    #[error("missing MEGA prefix")]
+    MissingMegaPrefix,
+
+    /// Json parse error
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+}
+
+/// File attributes
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct FileAttributes {
+    /// The name of the file
+    #[serde(rename = "n")]
+    pub name: String,
+
+    /// Unknown attributes
+    #[serde(flatten)]
+    pub unknown: HashMap<String, serde_json::Value>,
+}
+
 /// GetAttributes command response
 #[derive(Debug, serde::Serialize, serde:: Deserialize)]
 pub struct GetAttributes {
@@ -55,4 +96,24 @@ pub struct GetAttributes {
     /// The download url
     #[serde(rename = "g")]
     pub download_url: Option<Url>,
+}
+
+impl GetAttributes {
+    /// Decode the encoded attributes
+    pub fn decode_attributes(
+        &self,
+        key: &[u8; 16],
+    ) -> Result<FileAttributes, DecodeAttributesError> {
+        let mut encoded_attributes =
+            base64::decode_config(&self.encoded_attributes, base64::URL_SAFE)?;
+        let cipher = Aes128CbcDec::new(key.into(), &[0; 16].into());
+        let decrypted = cipher
+            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
+            .map_err(DecodeAttributesError::Decrypt)?;
+        let decrypted = std::str::from_utf8(decrypted)?;
+        let decrypted = decrypted
+            .strip_prefix("MEGA")
+            .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
+        Ok(serde_json::from_str(decrypted)?)
+    }
 }
