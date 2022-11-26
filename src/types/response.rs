@@ -108,13 +108,12 @@ impl GetAttributes {
             base64::decode_config(&self.encoded_attributes, base64::URL_SAFE)?;
         let cipher = Aes128CbcDec::new(key.into(), &[0; 16].into());
         let decrypted = cipher
-            .decrypt_padded_mut::<block_padding::NoPadding>(&mut encoded_attributes)
+            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
             .map_err(DecodeAttributesError::Decrypt)?;
         let decrypted = std::str::from_utf8(decrypted)?;
         let decrypted = decrypted
             .strip_prefix("MEGA")
-            .ok_or(DecodeAttributesError::MissingMegaPrefix)?
-            .trim_end_matches('\0');
+            .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
         Ok(serde_json::from_str(decrypted)?)
     }
 }
