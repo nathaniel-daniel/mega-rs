@@ -1,6 +1,7 @@
 mod types;
 
 pub use self::types::Command;
+pub use self::types::FileKey;
 pub use self::types::Response;
 pub use self::types::ResponseData;
 use std::sync::atomic::AtomicU64;
@@ -71,7 +72,20 @@ mod test {
 
     // const TEST_FILE: &str =
     //    "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
+    const TEST_FILE_KEY: &str = "Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     const TEST_FILE_ID: &str = "7glwEQBT";
+
+    #[test]
+    fn parse_file_key() {
+        let file_key: FileKey = TEST_FILE_KEY.parse().expect("failed to parse file key");
+        let expected = [
+            23, 47, 92, 192, 250, 66, 154, 230, 149, 116, 73, 22, 215, 218, 176, 4, 182, 162, 49,
+            236, 174, 124, 29, 100, 177, 234, 162, 176, 224, 49, 126, 47,
+        ];
+        assert!(file_key.0 == expected);
+        assert!(file_key.get_key() == &expected[..16]);
+        assert!(file_key.get_iv() == &expected[16..]);
+    }
 
     #[tokio::test]
     async fn execute_empty_commands() {
@@ -103,6 +117,9 @@ mod test {
             // _ => panic!("unexpected response"),
         };
         assert!(response.download_url.is_none());
+        response
+            .decode_attributes()
+            .expect("failed to decode attributes");
 
         let commands = vec![Command::GetAttributes {
             file_id: TEST_FILE_ID.into(),
@@ -121,5 +138,8 @@ mod test {
             // _ => panic!("unexpected response"),
         };
         assert!(response.download_url.is_some());
+        response
+            .decode_attributes()
+            .expect("failed to decode attributes");
     }
 }
