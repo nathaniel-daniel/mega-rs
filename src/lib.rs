@@ -97,6 +97,7 @@ mod test {
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
         let response = response.unwrap();
+        #[allow(clippy::infallible-destructuring-match)]
         let response = match response {
             ResponseData::GetAttributes(response) => response,
             // _ => panic!("unexpected response"),
@@ -114,6 +115,7 @@ mod test {
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
         let response = response.unwrap();
+        #[allow(clippy::infallible-destructuring-match)]
         let response = match response {
             ResponseData::GetAttributes(response) => response,
             // _ => panic!("unexpected response"),
