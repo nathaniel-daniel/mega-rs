@@ -42,6 +42,9 @@ pub struct ErrorCode(i32);
 pub enum ResponseData {
     /// Response for a GetAttributes command
     GetAttributes(GetAttributes),
+
+    /// Response for FetchNodes command
+    FetchNodes(FetchNodes),
 }
 
 /// An error that may occur while decoding attributes
@@ -96,6 +99,10 @@ pub struct GetAttributes {
     /// The download url
     #[serde(rename = "g")]
     pub download_url: Option<Url>,
+
+    /// Unknown attributes
+    #[serde(flatten)]
+    pub unknown: HashMap<String, serde_json::Value>,
 }
 
 impl GetAttributes {
@@ -116,4 +123,52 @@ impl GetAttributes {
             .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
         Ok(serde_json::from_str(decrypted)?)
     }
+}
+
+/// FetchNodes command response
+#[derive(Debug, serde::Serialize, serde:: Deserialize)]
+pub struct FetchNodes {
+    #[serde(rename = "f")]
+    pub files: Vec<FetchNodesNode>,
+
+    pub noc: u8,
+
+    pub sn: String,
+    pub st: String,
+
+    /// Unknown attributes
+    #[serde(flatten)]
+    pub unknown: HashMap<String, serde_json::Value>,
+}
+
+/// A FetchNodes Node
+#[derive(Debug, serde::Serialize, serde:: Deserialize)]
+pub struct FetchNodesNode {
+    pub a: String,
+    pub h: String,
+
+    /// The key of the node
+    #[serde(rename = "k")]
+    pub key: String,
+
+    pub p: String,
+
+    /// The kind of the node
+    #[serde(rename = "t")]
+    pub kind: u8,
+
+    /// The time of last modification
+    #[serde(rename = "ts")]
+    pub timestamp: u64,
+
+    pub u: String,
+    pub fa: Option<String>,
+
+    /// The size of the node
+    #[serde(rename = "size")]
+    pub size: Option<u64>,
+
+    /// Unknown attributes
+    #[serde(flatten)]
+    pub unknown: HashMap<String, serde_json::Value>,
 }

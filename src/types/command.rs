@@ -13,4 +13,8 @@ pub enum Command {
         #[serde(rename = "g")]
         include_download_url: Option<u8>,
     },
+
+    /// Fetch the nodes
+    #[serde(rename = "f")]
+    FetchNodes { c: u8, r: u8 },
 }

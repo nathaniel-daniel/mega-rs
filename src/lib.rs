@@ -36,7 +36,7 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            sequence_id: Arc::new(AtomicU64::new(0)),
+            sequence_id: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -44,9 +44,17 @@ impl Client {
     pub async fn execute_commands(
         &self,
         commands: &[Command],
+        node: Option<&str>,
     ) -> Result<Vec<Response<ResponseData>>, Error> {
         let id = self.sequence_id.fetch_add(1, Ordering::Relaxed);
-        let url = Url::parse_with_params("https://g.api.mega.co.nz/cs", &[("id", id.to_string())])?;
+        let mut url =
+            Url::parse_with_params("https://g.api.mega.co.nz/cs", &[("id", id.to_string())])?;
+        {
+            let mut query_pairs = url.query_pairs_mut();
+            if let Some(node) = node {
+                query_pairs.append_pair("n", node);
+            }
+        }
         let response = self
             .client
             .post(url)
@@ -75,6 +83,10 @@ mod test {
     const TEST_FILE_KEY: &str = "Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     const TEST_FILE_ID: &str = "7glwEQBT";
 
+    // const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
+    // const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
+    const TEST_FOLDER_ID: &str = "MWsm3aBL";
+
     const TEST_FILE_KEY_DECODED: &[u8; 16] = &[
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
     ];
@@ -89,7 +101,7 @@ mod test {
     async fn execute_empty_commands() {
         let client = Client::new();
         let response = client
-            .execute_commands(&[])
+            .execute_commands(&[], None)
             .await
             .expect("failed to execute commands");
         assert!(response.is_empty());
@@ -103,16 +115,15 @@ mod test {
             include_download_url: None,
         }];
         let mut response = client
-            .execute_commands(&commands)
+            .execute_commands(&commands, None)
             .await
             .expect("failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
         let response = response.unwrap();
-        #[allow(clippy::infallible_destructuring_match)]
         let response = match response {
             ResponseData::GetAttributes(response) => response,
-            // _ => panic!("unexpected response"),
+            _ => panic!("unexpected response"),
         };
         assert!(response.download_url.is_none());
         let file_attributes = response
@@ -125,21 +136,38 @@ mod test {
             include_download_url: Some(1),
         }];
         let mut response = client
-            .execute_commands(&commands)
+            .execute_commands(&commands, None)
             .await
             .expect("failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
         let response = response.unwrap();
-        #[allow(clippy::infallible_destructuring_match)]
         let response = match response {
             ResponseData::GetAttributes(response) => response,
-            // _ => panic!("unexpected response"),
+            _ => panic!("unexpected response"),
         };
         assert!(response.download_url.is_some());
         let file_attributes = response
             .decode_attributes(TEST_FILE_KEY_DECODED)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "Doxygen_docs.zip");
+    }
+
+    #[tokio::test]
+    async fn execute_fetch_nodes_command() {
+        let client = Client::new();
+        let commands = vec![Command::FetchNodes { c: 1, r: 1 }];
+        let mut response = client
+            .execute_commands(&commands, Some(TEST_FOLDER_ID))
+            .await
+            .expect("failed to execute commands");
+        assert!(response.len() == 1);
+        let response = response.swap_remove(0);
+        let response = response.unwrap();
+        let response = match response {
+            ResponseData::FetchNodes(response) => response,
+            _ => panic!("unexpected response"),
+        };
+        dbg!(response);
     }
 }
