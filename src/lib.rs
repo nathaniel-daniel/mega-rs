@@ -2,6 +2,9 @@ mod types;
 
 pub use self::types::Command;
 pub use self::types::FileKey;
+pub use self::types::FileKeyParseError;
+pub use self::types::FolderKey;
+pub use self::types::FolderKeyParseError;
 pub use self::types::Response;
 pub use self::types::ResponseData;
 use std::sync::atomic::AtomicU64;
@@ -84,17 +87,26 @@ mod test {
     const TEST_FILE_ID: &str = "7glwEQBT";
 
     // const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
-    // const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
+    const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     const TEST_FOLDER_ID: &str = "MWsm3aBL";
 
     const TEST_FILE_KEY_DECODED: &[u8; 16] = &[
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
+    ];
+    const TEST_FOLDER_KEY_DECODED: &[u8; 16] = &[
+        198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ];
 
     #[test]
     fn parse_file_key() {
         let file_key: FileKey = TEST_FILE_KEY.parse().expect("failed to parse file key");
         assert!(&file_key.0 == TEST_FILE_KEY_DECODED);
+    }
+
+    #[test]
+    fn parse_folder_key() {
+        let folder_key: FolderKey = TEST_FOLDER_KEY.parse().expect("failed to parse folder key");
+        assert!(&folder_key.0 == TEST_FOLDER_KEY_DECODED);
     }
 
     #[tokio::test]
@@ -155,6 +167,8 @@ mod test {
 
     #[tokio::test]
     async fn execute_fetch_nodes_command() {
+        let folder_key = FolderKey(*TEST_FOLDER_KEY_DECODED);
+
         let client = Client::new();
         let commands = vec![Command::FetchNodes { c: 1, r: 1 }];
         let mut response = client
@@ -168,6 +182,10 @@ mod test {
             ResponseData::FetchNodes(response) => response,
             _ => panic!("unexpected response"),
         };
-        dbg!(response);
+        assert!(response.files.len() == 2);
+        let file_attributes = response.files[0]
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "test");
     }
 }

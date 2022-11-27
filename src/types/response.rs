@@ -1,3 +1,5 @@
+use crate::FolderKey;
+use crate::FolderKeyParseError;
 use cbc::cipher::BlockDecryptMut;
 use cbc::cipher::KeyIvInit;
 use std::collections::HashMap;
@@ -69,6 +71,10 @@ pub enum DecodeAttributesError {
     /// Json parse error
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+
+    /// Failed to parse a folder key
+    #[error("failed to parse folder key")]
+    ParseFolderKey(#[from] FolderKeyParseError),
 }
 
 /// File attributes
@@ -141,34 +147,102 @@ pub struct FetchNodes {
     pub unknown: HashMap<String, serde_json::Value>,
 }
 
+/// The kind of node
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Copy,
+    Clone,
+    serde_repr::Deserialize_repr,
+    serde_repr::Serialize_repr,
+)]
+#[repr(u8)]
+pub enum FetchNodesNodeKind {
+    /// A file
+    File = 0,
+
+    /// A directory
+    Directory = 1,
+
+    /// The special root directory
+    Root = 2,
+
+    /// The special inbox directory
+    Inbox = 3,
+
+    /// The special trash bin directory
+    TrashBin = 4,
+}
+
 /// A FetchNodes Node
 #[derive(Debug, serde::Serialize, serde:: Deserialize)]
 pub struct FetchNodesNode {
-    pub a: String,
-    pub h: String,
+    /// The attributes of the node
+    #[serde(rename = "a")]
+    pub encoded_attributes: String,
+
+    /// The id of the node
+    #[serde(rename = "h")]
+    pub id: String,
 
     /// The key of the node
     #[serde(rename = "k")]
     pub key: String,
 
-    pub p: String,
+    /// The id of the parent node
+    #[serde(rename = "p")]
+    pub parent_id: String,
 
     /// The kind of the node
     #[serde(rename = "t")]
-    pub kind: u8,
+    pub kind: FetchNodesNodeKind,
 
     /// The time of last modification
     #[serde(rename = "ts")]
     pub timestamp: u64,
 
-    pub u: String,
+    /// The owner of the node
+    #[serde(rename = "u")]
+    pub user: String,
+
     pub fa: Option<String>,
 
     /// The size of the node
-    #[serde(rename = "size")]
+    #[serde(rename = "s")]
     pub size: Option<u64>,
 
     /// Unknown attributes
     #[serde(flatten)]
     pub unknown: HashMap<String, serde_json::Value>,
+}
+
+impl FetchNodesNode {
+    /// Decode the encoded attributes
+    pub fn decode_attributes(
+        &self,
+        folder_key: &FolderKey,
+    ) -> Result<FileAttributes, DecodeAttributesError> {
+        let mut encoded_attributes =
+            base64::decode_config(&self.encoded_attributes, base64::URL_SAFE)?;
+        let key = self
+            .key
+            .trim_start_matches(&self.id)
+            .trim_start_matches(':');
+        let mut key = base64::decode_config(key, base64::URL_SAFE)?;
+        let cipher = Aes128CbcDec::new(folder_key.0.as_slice().into(), &[0; 16].into());
+        cipher
+            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut key)
+            .map_err(DecodeAttributesError::Decrypt)?;
+        let cipher = Aes128CbcDec::new(key.as_slice().into(), &[0; 16].into());
+        let decrypted = cipher
+            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
+            .map_err(DecodeAttributesError::Decrypt)?;
+        let decrypted = std::str::from_utf8(decrypted)?;
+        let decrypted = decrypted
+            .strip_prefix("MEGA")
+            .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
+        Ok(serde_json::from_str(decrypted)?)
+    }
 }
