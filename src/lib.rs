@@ -140,7 +140,7 @@ mod test {
             .expect("failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
-        let response = response.unwrap();
+        let response = response.into_result().expect("response was an error");
         let response = match response {
             ResponseData::GetAttributes(response) => response,
             _ => panic!("unexpected response"),
@@ -161,7 +161,7 @@ mod test {
             .expect("failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
-        let response = response.unwrap();
+        let response = response.into_result().expect("response was an error");
         let response = match response {
             ResponseData::GetAttributes(response) => response,
             _ => panic!("unexpected response"),
@@ -185,7 +185,7 @@ mod test {
             .expect("failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
-        let response = response.unwrap();
+        let response = response.into_result().expect("response was an error");
         let response = match response {
             ResponseData::FetchNodes(response) => response,
             _ => panic!("unexpected response"),

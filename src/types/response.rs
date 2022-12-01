@@ -26,13 +26,11 @@ pub enum Response<T> {
 }
 
 impl<T> Response<T> {
-    /// Unwrap the response, panicing on failure.
-    ///
-    /// Intended for quick testing and scripting.
-    pub fn unwrap(self) -> T {
+    /// Convert this into a Result.
+    pub fn into_result(self) -> Result<T, ErrorCode> {
         match self {
-            Self::Error(error) => panic!("Called 'unwrap' on Error({error:#?})"),
-            Self::Ok(t) => t,
+            Self::Ok(t) => Ok(t),
+            Self::Error(error) => Err(error),
         }
     }
 }
