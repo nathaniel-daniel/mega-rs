@@ -41,6 +41,8 @@ impl<T> Response<T> {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct ErrorCode(i32);
 
+impl ErrorCode {}
+
 /// API Response data
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
