@@ -410,6 +410,7 @@ dependencies = [
  "block-padding",
  "cbc",
  "ecb",
+ "itoa",
  "reqwest",
  "serde",
  "serde_json",
