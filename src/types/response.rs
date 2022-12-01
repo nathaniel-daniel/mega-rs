@@ -110,6 +110,14 @@ impl ErrorCode {
     pub const EAPPKEY: Self = ErrorCode(-22);
 }
 
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ErrorCode {}
+
 /// API Response data
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
