@@ -39,7 +39,76 @@ impl<T> Response<T> {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct ErrorCode(i32);
 
-impl ErrorCode {}
+impl ErrorCode {
+    /// Success
+    pub const OK: Self = ErrorCode(0);
+
+    /// Internal Error
+    pub const EINTERNAL: Self = ErrorCode(-1);
+
+    /// Invalid arguments
+    pub const EARGS: Self = ErrorCode(-2);
+
+    /// Invalid arguments
+    pub const EAGAIN: Self = ErrorCode(-3);
+
+    /// Ratelimited
+    pub const ERATELIMIT: Self = ErrorCode(-4);
+
+    /// Upload failed
+    pub const EFAILED: Self = ErrorCode(-5);
+
+    /// Too many ips are trying to access this resource
+    pub const ETOOMANY: Self = ErrorCode(-6);
+
+    /// The file packet is out of range
+    pub const ERANGE: Self = ErrorCode(-7);
+
+    /// The upload target url has expired
+    pub const EEXPIRED: Self = ErrorCode(-8);
+
+    /// Object not found
+    pub const EOENT: Self = ErrorCode(-9);
+
+    /// Attempted circular link
+    pub const ECIRCULAR: Self = ErrorCode(-10);
+
+    /// Access violation (like writing to a read-only share)
+    pub const EACCESS: Self = ErrorCode(-11);
+
+    /// Tried to create an object that already exists
+    pub const EEXIST: Self = ErrorCode(-12);
+
+    /// Tried to access an incomplete resource
+    pub const EINCOMPLETE: Self = ErrorCode(-13);
+
+    /// A decryption operation failed
+    pub const EKEY: Self = ErrorCode(-14);
+
+    /// Invalid or expired user session
+    pub const ESID: Self = ErrorCode(-15);
+
+    /// User blocked
+    pub const EBLOCKED: Self = ErrorCode(-16);
+
+    /// Request over quota
+    pub const EOVERQUOTA: Self = ErrorCode(-17);
+
+    /// Resource temporarily unavailable
+    pub const ETEMPUNAVAIL: Self = ErrorCode(-18);
+
+    /// Too many connections to this resource
+    pub const ETOOMANYCONNECTIONS: Self = ErrorCode(-19);
+
+    /// Write failed
+    pub const EWRITE: Self = ErrorCode(-20);
+
+    /// Read failed
+    pub const EREAD: Self = ErrorCode(-21);
+
+    /// Invalid App key
+    pub const EAPPKEY: Self = ErrorCode(-22);
+}
 
 /// API Response data
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
