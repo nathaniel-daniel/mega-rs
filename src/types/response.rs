@@ -36,7 +36,7 @@ impl<T> Response<T> {
 }
 
 /// An API Error
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ErrorCode(i32);
 
 impl ErrorCode {
@@ -68,7 +68,7 @@ impl ErrorCode {
     pub const EEXPIRED: Self = ErrorCode(-8);
 
     /// Object not found
-    pub const EOENT: Self = ErrorCode(-9);
+    pub const ENOENT: Self = ErrorCode(-9);
 
     /// Attempted circular link
     pub const ECIRCULAR: Self = ErrorCode(-10);
@@ -126,11 +126,47 @@ impl ErrorCode {
 
     /// Over Disk Quota Paywall
     pub const EPAYWALL: Self = ErrorCode(-29);
+
+    /// Get a human-friendly description if the error
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::OK => "No error",
+            Self::EINTERNAL => "Internal error",
+            Self::EARGS => "Invalid argument",
+            Self::EAGAIN => "Request failed, retrying",
+            Self::ERATELIMIT => "Rate limit exceeded",
+            Self::EFAILED => "Failed permanently",
+            Self::ETOOMANY => "Too many concurrent connections or transfers", // TODO: This can switch on a context variable
+            Self::ERANGE => "Out of range",
+            Self::EEXPIRED => "Expired",
+            Self::ENOENT => "Not found",
+            Self::ECIRCULAR => "Circular linkage detected", // TODO: This can switch on a context variable
+            Self::EACCESS => "Access denied",
+            Self::EEXIST => "Already exists",
+            Self::EINCOMPLETE => "Incomplete",
+            Self::EKEY => "Invalid key/Decryption error",
+            Self::ESID => "Bad session ID",
+            Self::EBLOCKED => "Blocked", // TODO: This can switch on a context variable
+            Self::EOVERQUOTA => "Over quota",
+            Self::ETEMPUNAVAIL => "Temporarily not available",
+            Self::ETOOMANYCONNECTIONS => "Connection overflow",
+            Self::EWRITE => "Write error",
+            Self::EREAD => "Read error",
+            Self::EAPPKEY => "Invalid application key",
+            Self::ESSL => "SSL verification failed",
+            Self::EGOINGOVERQUOTA => "Not enough quota",
+            Self::EMFAREQUIRED => "Multi-factor authentication required",
+            Self::EMASTERONLY => "Access denied for users",
+            Self::EBUSINESSPASTDUE => "Business account has expired",
+            Self::EPAYWALL => "Storage Quota Exceeded. Upgrade now",
+            _ => "Unknown error",
+        }
+    }
 }
 
 impl std::fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{}", self.description())
     }
 }
 
