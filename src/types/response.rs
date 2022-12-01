@@ -127,10 +127,7 @@ pub struct GetAttributes {
 
 impl GetAttributes {
     /// Decode the encoded attributes
-    pub fn decode_attributes(
-        &self,
-        key: &[u8; 16],
-    ) -> Result<FileAttributes, DecodeAttributesError> {
+    pub fn decode_attributes(&self, key: u128) -> Result<FileAttributes, DecodeAttributesError> {
         decode_attributes(&self.encoded_attributes, key)
     }
 }
@@ -239,32 +236,34 @@ impl FetchNodesNode {
             .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
         let key_len = key.len();
-        let key: [u8; 16] = if self.kind == FetchNodesNodeKind::Directory {
+        let key: u128 = if self.kind == FetchNodesNodeKind::Directory {
             if key_len != 16 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
             }
 
-            key.try_into().unwrap()
+            // Length check is done above
+            u128::from_ne_bytes(key.try_into().unwrap())
         } else {
             if key_len != 32 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
             }
 
-            FileKey::from_encoded_bytes(key.try_into().unwrap()).0
+            // Length check is done above
+            FileKey::from_encoded_bytes(key.try_into().unwrap()).key
         };
 
-        decode_attributes(&self.encoded_attributes, &key)
+        decode_attributes(&self.encoded_attributes, key)
     }
 }
 
 /// Decode the encoded attributes
 fn decode_attributes(
     encoded_attributes: &str,
-    key: &[u8; 16],
+    key: u128,
 ) -> Result<FileAttributes, DecodeAttributesError> {
     let mut encoded_attributes = base64::decode_config(encoded_attributes, base64::URL_SAFE)?;
 
-    let cipher = Aes128CbcDec::new(key.into(), &[0; 16].into());
+    let cipher = Aes128CbcDec::new(&key.to_ne_bytes().into(), &[0; 16].into());
     let decrypted = cipher
         .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
         .map_err(DecodeAttributesError::Decrypt)?;

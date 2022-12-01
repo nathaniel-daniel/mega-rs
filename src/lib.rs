@@ -90,9 +90,13 @@ mod test {
     const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     const TEST_FOLDER_ID: &str = "MWsm3aBL";
 
-    const TEST_FILE_KEY_DECODED: &[u8; 16] = &[
+    const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_ne_bytes([
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
-    ];
+    ]);
+    const TEST_FILE_KEY_IV_DECODED: u128 =
+        u128::from_ne_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const TEST_FILE_META_MAC_DECODED: u64 =
+        u64::from_ne_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
     const TEST_FOLDER_KEY_DECODED: u128 = u128::from_ne_bytes([
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ]);
@@ -100,7 +104,9 @@ mod test {
     #[test]
     fn parse_file_key() {
         let file_key: FileKey = TEST_FILE_KEY.parse().expect("failed to parse file key");
-        assert!(&file_key.0 == TEST_FILE_KEY_DECODED);
+        assert!(file_key.key == TEST_FILE_KEY_KEY_DECODED);
+        assert!(file_key.iv == TEST_FILE_KEY_IV_DECODED);
+        assert!(file_key.meta_mac == TEST_FILE_META_MAC_DECODED);
     }
 
     #[test]
@@ -139,7 +145,7 @@ mod test {
         };
         assert!(response.download_url.is_none());
         let file_attributes = response
-            .decode_attributes(TEST_FILE_KEY_DECODED)
+            .decode_attributes(TEST_FILE_KEY_KEY_DECODED)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "Doxygen_docs.zip");
 
@@ -160,7 +166,7 @@ mod test {
         };
         assert!(response.download_url.is_some());
         let file_attributes = response
-            .decode_attributes(TEST_FILE_KEY_DECODED)
+            .decode_attributes(TEST_FILE_KEY_KEY_DECODED)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "Doxygen_docs.zip");
     }
