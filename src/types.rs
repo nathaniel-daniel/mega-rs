@@ -1,9 +1,11 @@
 mod command;
+mod error_code;
 mod file_key;
 mod folder_key;
 mod response;
 
 pub use self::command::Command;
+pub use self::error_code::ErrorCode;
 pub use self::file_key::FileKey;
 pub use self::file_key::ParseError as FileKeyParseError;
 pub use self::folder_key::FolderKey;
