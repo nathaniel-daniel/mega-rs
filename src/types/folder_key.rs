@@ -1,8 +1,14 @@
 const KEY_SIZE: usize = 16;
+const BASE64_LEN: usize = 22;
+const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
 
 /// An error that may occur while parsing a FolderKey.
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
+    /// The base64 string is the wrong size
+    #[error("invalid base64 length '{length}', expected length of '{BASE64_LEN}'")]
+    InvalidBase64Length { length: usize },
+
     /// An error occured while decoding base64
     #[error(transparent)]
     Base64Decode(#[from] base64::DecodeError),
@@ -22,7 +28,15 @@ impl std::str::FromStr for FolderKey {
     type Err = ParseError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let input = base64::decode_config(input, base64::URL_SAFE)?;
+        let length = input.len();
+        if length < BASE64_LEN {
+            return Err(ParseError::InvalidBase64Length { length });
+        }
+
+        let mut base64_decode_buffer = [0; BASE64_DECODE_BUFFER_LEN];
+        let decoded_len =
+            base64::decode_config_slice(input, base64::URL_SAFE, &mut base64_decode_buffer)?;
+        let input = &base64_decode_buffer[..decoded_len];
 
         let length = input.len();
         if length != KEY_SIZE {
