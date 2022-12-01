@@ -1,5 +1,7 @@
 mod client;
 mod types;
+#[cfg(feature = "easy")]
+mod easy;
 
 pub use self::client::Client;
 pub use self::types::Command;

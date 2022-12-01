@@ -57,8 +57,14 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           
-      - name: Build no features
+      - name: Build
         run: cargo build --verbose
+        
+      - name: Build with "easy" feature
+        run: cargo build --features=easy --verbose
 
       - name: Run Tests
         run: cargo test --all --verbose
+        
+      - name: Run Tests with "easy" feature
+        run: cargo test --all --features=easy --verbose
