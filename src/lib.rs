@@ -1,14 +1,18 @@
 mod client;
-mod types;
 #[cfg(feature = "easy")]
 mod easy;
+mod types;
 
 pub use self::client::Client;
+#[cfg(feature = "easy")]
+pub use self::easy::Client as EasyClient;
 pub use self::types::Command;
+pub use self::types::ErrorCode;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
 pub use self::types::FolderKey;
 pub use self::types::FolderKeyParseError;
+pub use self::types::GetAttributesResponse;
 pub use self::types::Response;
 pub use self::types::ResponseData;
 
@@ -22,6 +26,26 @@ pub enum Error {
     /// A Url Error
     #[error(transparent)]
     Url(#[from] url::ParseError),
+
+    /// The returned number of responses did not match what was expected
+    #[error("expected '{expected}' responses, but got '{actual}'")]
+    ResponseLengthMismatch { expected: usize, actual: usize },
+
+    /// There was an api error
+    #[error("api error")]
+    ApiError(#[from] self::types::ErrorCode),
+
+    #[cfg(feature = "easy")]
+    #[error("channel closed without response")]
+    NoResponse,
+
+    #[cfg(feature = "easy")]
+    #[error("error occured as part of a batched send")]
+    BatchSend(self::easy::ArcError<Self>),
+
+    #[cfg(feature = "easy")]
+    #[error("unexpected response data type")]
+    UnexpectedResponseDataType,
 }
 
 #[cfg(test)]

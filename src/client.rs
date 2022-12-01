@@ -8,7 +8,7 @@ use std::sync::Arc;
 use url::Url;
 
 /// A client
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     /// The inner http client
     pub client: reqwest::Client,
@@ -43,7 +43,7 @@ impl Client {
                 query_pairs.append_pair("n", node);
             }
         }
-        let response = self
+        let response: Vec<_> = self
             .client
             .post(url)
             .json(commands)
@@ -52,6 +52,14 @@ impl Client {
             .error_for_status()?
             .json()
             .await?;
+        let commands_len = commands.len();
+        let response_len = response.len();
+        if response_len != commands_len {
+            return Err(Error::ResponseLengthMismatch {
+                expected: commands_len,
+                actual: response_len,
+            });
+        }
         Ok(response)
     }
 }
