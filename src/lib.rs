@@ -50,7 +50,7 @@ mod test {
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ]);
 
-    const TEST_FILE_BYTES: &[u8] = include_bytes!("../test_data/Doxygen_Docs.zip");
+    const TEST_FILE_BYTES: &[u8] = include_bytes!("../test_data/Doxygen_docs.zip");
 
     #[test]
     fn parse_file_key() {
