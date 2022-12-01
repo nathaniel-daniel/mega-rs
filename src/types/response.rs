@@ -108,6 +108,24 @@ impl ErrorCode {
 
     /// Invalid App key
     pub const EAPPKEY: Self = ErrorCode(-22);
+
+    /// SSL verification failed
+    pub const ESSL: Self = ErrorCode(-23);
+
+    /// Not enough quota
+    pub const EGOINGOVERQUOTA: Self = ErrorCode(-24);
+
+    /// Need multifactor authentication
+    pub const EMFAREQUIRED: Self = ErrorCode(-26);
+
+    /// Access denied for sub-users (buisness accounts only)
+    pub const EMASTERONLY: Self = ErrorCode(-27);
+
+    /// Business account expired
+    pub const EBUSINESSPASTDUE: Self = ErrorCode(-28);
+
+    /// Over Disk Quota Paywall
+    pub const EPAYWALL: Self = ErrorCode(-29);
 }
 
 impl std::fmt::Display for ErrorCode {
