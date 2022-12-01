@@ -13,8 +13,20 @@ pub enum ParseError {
 }
 
 /// The encryption key for a file.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct FileKey(pub [u8; KEY_SIZE]);
+
+impl FileKey {
+    /// Make a FileKey from encoded bytes
+    pub(crate) fn from_encoded_bytes(input: &[u8; KEY_SIZE * 2]) -> Self {
+        let (n1, n2) = input.split_at(KEY_SIZE);
+        let n1 = u128::from_ne_bytes(n1.try_into().unwrap());
+        let n2 = u128::from_ne_bytes(n2.try_into().unwrap());
+        let key = n1 ^ n2;
+
+        Self(key.to_ne_bytes())
+    }
+}
 
 impl std::str::FromStr for FileKey {
     type Err = ParseError;
@@ -25,14 +37,9 @@ impl std::str::FromStr for FileKey {
         if length != 2 * KEY_SIZE {
             return Err(ParseError::InvalidLength { length });
         }
-        let mut key = [0; KEY_SIZE];
-        for (key, (n1, n2)) in key
-            .iter_mut()
-            .zip(input[..KEY_SIZE].iter().zip(input[KEY_SIZE..].iter()))
-        {
-            *key = n1 ^ n2;
-        }
 
-        Ok(Self(key))
+        Ok(Self::from_encoded_bytes(
+            input.as_slice().try_into().unwrap(),
+        ))
     }
 }

@@ -1,11 +1,14 @@
+use crate::FileKey;
 use crate::FolderKey;
 use crate::FolderKeyParseError;
 use cbc::cipher::BlockDecryptMut;
+use cbc::cipher::KeyInit;
 use cbc::cipher::KeyIvInit;
 use std::collections::HashMap;
 use url::Url;
 
 type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
+type Aes128EcbDec = ecb::Decryptor<aes::Aes128>;
 
 /// An api response
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -75,6 +78,14 @@ pub enum DecodeAttributesError {
     /// Failed to parse a folder key
     #[error("failed to parse folder key")]
     ParseFolderKey(#[from] FolderKeyParseError),
+
+    /// A key was missing a header
+    #[error("key missing header")]
+    KeyMissingHeader,
+
+    /// The key was the wrong size
+    #[error("invalid key length '{length}'")]
+    InvalidKeyLength { length: usize },
 }
 
 /// File attributes
@@ -83,6 +94,9 @@ pub struct FileAttributes {
     /// The name of the file
     #[serde(rename = "n")]
     pub name: String,
+
+    /// ?
+    pub c: Option<String>,
 
     /// Unknown attributes
     #[serde(flatten)]
@@ -117,17 +131,7 @@ impl GetAttributes {
         &self,
         key: &[u8; 16],
     ) -> Result<FileAttributes, DecodeAttributesError> {
-        let mut encoded_attributes =
-            base64::decode_config(&self.encoded_attributes, base64::URL_SAFE)?;
-        let cipher = Aes128CbcDec::new(key.into(), &[0; 16].into());
-        let decrypted = cipher
-            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
-            .map_err(DecodeAttributesError::Decrypt)?;
-        let decrypted = std::str::from_utf8(decrypted)?;
-        let decrypted = decrypted
-            .strip_prefix("MEGA")
-            .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
-        Ok(serde_json::from_str(decrypted)?)
+        decode_attributes(&self.encoded_attributes, key)
     }
 }
 
@@ -224,25 +228,51 @@ impl FetchNodesNode {
         &self,
         folder_key: &FolderKey,
     ) -> Result<FileAttributes, DecodeAttributesError> {
-        let mut encoded_attributes =
-            base64::decode_config(&self.encoded_attributes, base64::URL_SAFE)?;
-        let key = self
+        let (_, key) = self
             .key
-            .trim_start_matches(&self.id)
-            .trim_start_matches(':');
+            .split_once(':')
+            .ok_or(DecodeAttributesError::KeyMissingHeader)?;
+
         let mut key = base64::decode_config(key, base64::URL_SAFE)?;
-        let cipher = Aes128CbcDec::new(folder_key.0.as_slice().into(), &[0; 16].into());
-        cipher
-            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut key)
+        let cipher = Aes128EcbDec::new(&folder_key.0.to_ne_bytes().into());
+        let key = cipher
+            .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
-        let cipher = Aes128CbcDec::new(key.as_slice().into(), &[0; 16].into());
-        let decrypted = cipher
-            .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
-            .map_err(DecodeAttributesError::Decrypt)?;
-        let decrypted = std::str::from_utf8(decrypted)?;
-        let decrypted = decrypted
-            .strip_prefix("MEGA")
-            .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
-        Ok(serde_json::from_str(decrypted)?)
+        let key_len = key.len();
+        let key: [u8; 16] = if self.kind == FetchNodesNodeKind::Directory {
+            if key_len != 16 {
+                return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
+            }
+
+            key.try_into().unwrap()
+        } else {
+            if key_len != 32 {
+                return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
+            }
+
+            FileKey::from_encoded_bytes(key.try_into().unwrap()).0
+        };
+
+        decode_attributes(&self.encoded_attributes, &key)
     }
+}
+
+/// Decode the encoded attributes
+fn decode_attributes(
+    encoded_attributes: &str,
+    key: &[u8; 16],
+) -> Result<FileAttributes, DecodeAttributesError> {
+    let mut encoded_attributes = base64::decode_config(encoded_attributes, base64::URL_SAFE)?;
+
+    let cipher = Aes128CbcDec::new(key.into(), &[0; 16].into());
+    let decrypted = cipher
+        .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
+        .map_err(DecodeAttributesError::Decrypt)?;
+
+    let decrypted = std::str::from_utf8(decrypted)?;
+    let decrypted = decrypted
+        .strip_prefix("MEGA")
+        .ok_or(DecodeAttributesError::MissingMegaPrefix)?;
+
+    Ok(serde_json::from_str(decrypted)?)
 }

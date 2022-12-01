@@ -93,9 +93,9 @@ mod test {
     const TEST_FILE_KEY_DECODED: &[u8; 16] = &[
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
     ];
-    const TEST_FOLDER_KEY_DECODED: &[u8; 16] = &[
+    const TEST_FOLDER_KEY_DECODED: u128 = u128::from_ne_bytes([
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
-    ];
+    ]);
 
     #[test]
     fn parse_file_key() {
@@ -106,7 +106,7 @@ mod test {
     #[test]
     fn parse_folder_key() {
         let folder_key: FolderKey = TEST_FOLDER_KEY.parse().expect("failed to parse folder key");
-        assert!(&folder_key.0 == TEST_FOLDER_KEY_DECODED);
+        assert!(folder_key.0 == TEST_FOLDER_KEY_DECODED);
     }
 
     #[tokio::test]
@@ -167,7 +167,7 @@ mod test {
 
     #[tokio::test]
     async fn execute_fetch_nodes_command() {
-        let folder_key = FolderKey(*TEST_FOLDER_KEY_DECODED);
+        let folder_key = FolderKey(TEST_FOLDER_KEY_DECODED);
 
         let client = Client::new();
         let commands = vec![Command::FetchNodes { c: 1, r: 1 }];
@@ -182,10 +182,20 @@ mod test {
             ResponseData::FetchNodes(response) => response,
             _ => panic!("unexpected response"),
         };
-        assert!(response.files.len() == 2);
+        assert!(response.files.len() == 3);
         let file_attributes = response.files[0]
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
+
+        let file_attributes = dbg!(&response.files[1])
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "test.txt");
+
+        let file_attributes = dbg!(&response.files[2])
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "testfolder");
     }
 }
