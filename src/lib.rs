@@ -34,7 +34,7 @@ pub enum Error {
 
     /// There was an api error
     #[error("api error")]
-    ApiError(#[from] self::types::ErrorCode),
+    ApiError(#[from] ErrorCode),
 
     #[cfg(feature = "easy")]
     #[error("channel closed without response")]

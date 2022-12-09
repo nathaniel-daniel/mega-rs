@@ -1,11 +1,13 @@
 use crate::Command;
 use crate::Error;
+use crate::ErrorCode;
 use crate::Response;
 use crate::ResponseData;
 use rand::Rng;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::time::Duration;
 use url::Url;
 
 /// A client
@@ -44,16 +46,30 @@ impl Client {
                 query_pairs.append_pair("n", node);
             }
         }
-        let response: Response<Vec<_>> = self
-            .client
-            .post(url)
-            .json(commands)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        let response = response.into_result()?;
+
+        let mut retries = 0;
+        let response = loop {
+            let response: Response<Vec<_>> = self
+                .client
+                .post(url.as_str())
+                .json(commands)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            let response = response.into_result();
+
+            if retries < 3 && matches!(response, Err(ErrorCode::EAGAIN)) {
+                let millis = 250 * (1 << retries);
+                tokio::time::sleep(Duration::from_millis(millis)).await;
+                retries += 1;
+                continue;
+            }
+
+            break response;
+        };
+        let response = response?;
 
         let commands_len = commands.len();
         let response_len = response.len();
