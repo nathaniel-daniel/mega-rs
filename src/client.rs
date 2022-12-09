@@ -30,6 +30,12 @@ impl Client {
     }
 
     /// Execute a series of commands.
+    ///
+    /// # Retries
+    /// If the client receives an EAGAIN,
+    /// it will attempt to retry the request.
+    /// After a number of tries with the same EAGAIN error,
+    /// the client will return EAGAIN to the caller.
     pub async fn execute_commands(
         &self,
         commands: &[Command],
