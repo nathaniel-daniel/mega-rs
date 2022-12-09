@@ -44,7 +44,7 @@ impl Client {
                 query_pairs.append_pair("n", node);
             }
         }
-        let response: Vec<_> = self
+        let response: Response<Vec<_>> = self
             .client
             .post(url)
             .json(commands)
@@ -53,6 +53,8 @@ impl Client {
             .error_for_status()?
             .json()
             .await?;
+        let response = response.into_result()?;
+
         let commands_len = commands.len();
         let response_len = response.len();
         if response_len != commands_len {
@@ -61,6 +63,7 @@ impl Client {
                 actual: response_len,
             });
         }
+
         Ok(response)
     }
 }
