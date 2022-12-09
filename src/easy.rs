@@ -1,11 +1,18 @@
 use crate::Command;
 use crate::Error;
 use crate::FetchNodesResponse;
+use crate::FileKey;
 use crate::GetAttributesResponse;
 use crate::ResponseData;
+use cbc::cipher::KeyIvInit;
+use cbc::cipher::StreamCipher;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::Mutex;
+use tokio_stream::Stream;
+use tokio_stream::StreamExt;
+
+type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
 /// A client
 #[derive(Debug, Clone)]
@@ -131,6 +138,41 @@ impl Client {
 
         Ok(response)
     }
+
+    /// Download a file without verifying its integrity.
+    ///
+    /// # Returns
+    /// Returns a stream, which returns decrypted file chunks as items.
+    pub async fn download_file_no_verify(
+        &self,
+        file_key: &FileKey,
+        url: &str,
+    ) -> Result<impl Stream<Item = Result<Vec<u8>, Error>>, Error> {
+        let response = self
+            .client
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let mut cipher = Aes128Ctr128BE::new(
+            &file_key.key.to_ne_bytes().into(),
+            &file_key.iv.to_ne_bytes().into(),
+        );
+
+        Ok(response.bytes_stream().map(move |chunk| {
+            chunk
+                .map(|chunk| {
+                    // TODO: Consider moving to blocking thread
+                    // This takes around 0.5-1.5 milliseconds on my laptop, making this borderline.
+                    let mut chunk = chunk.to_vec();
+                    cipher.apply_keystream(&mut chunk);
+                    chunk
+                })
+                .map_err(Error::from)
+        }))
+    }
 }
 
 impl Default for Client {
@@ -255,5 +297,34 @@ mod test {
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");
+    }
+
+    #[tokio::test]
+    async fn download_file_no_verify() {
+        let file_key = FileKey {
+            key: TEST_FILE_KEY_KEY_DECODED,
+            iv: TEST_FILE_KEY_IV_DECODED,
+            meta_mac: TEST_FILE_META_MAC_DECODED,
+        };
+
+        let client = Client::new();
+        let attributes = client.get_attributes(TEST_FILE_ID, true);
+        client.send_commands();
+        let attributes = attributes.await.expect("failed to get attributes");
+        let url = attributes.download_url.expect("missing download url");
+        let mut stream = client
+            .download_file_no_verify(&file_key, url.as_str())
+            .await
+            .expect("failed to get download stream");
+        let mut file = Vec::with_capacity(1024 * 1024);
+        while let Some(chunk) = stream
+            .next()
+            .await
+            .transpose()
+            .expect("failed to get next chunk")
+        {
+            file.extend(chunk);
+        }
+        assert!(file == TEST_FILE_BYTES);
     }
 }

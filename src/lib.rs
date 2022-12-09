@@ -93,6 +93,51 @@ mod test {
         assert!(folder_key.0 == TEST_FOLDER_KEY_DECODED);
     }
 
+    /// An iterator over chunks
+    struct ChunkIter {
+        /// The offset into the file
+        offset: u64,
+        delta: u64,
+    }
+
+    impl ChunkIter {
+        fn new() -> Self {
+            Self {
+                delta: 0,
+                offset: 0,
+            }
+        }
+    }
+
+    impl Iterator for ChunkIter {
+        type Item = (u64, u64);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.delta += 128 * 1024;
+            self.delta = std::cmp::min(self.delta, 1024 * 1024);
+
+            let old_offset = self.offset;
+            self.offset += self.delta;
+
+            Some((old_offset, self.delta))
+        }
+    }
+
+    #[test]
+    fn chunk_iter() {
+        let mut iter = ChunkIter::new();
+        assert!(iter.next() == Some((0, 128 * 1024)));
+        assert!(iter.next() == Some((128 * 1024, 128 * 2 * 1024)));
+        assert!(iter.next() == Some((128 * 3 * 1024, 128 * 3 * 1024)));
+        assert!(iter.next() == Some((128 * 6 * 1024, 128 * 4 * 1024)));
+        assert!(iter.next() == Some((128 * 10 * 1024, 128 * 5 * 1024)));
+        assert!(iter.next() == Some((128 * 15 * 1024, 128 * 6 * 1024)));
+        assert!(iter.next() == Some((128 * 21 * 1024, 128 * 7 * 1024)));
+        assert!(iter.next() == Some((128 * 28 * 1024, 128 * 8 * 1024)));
+        assert!(iter.next() == Some((128 * 36 * 1024, 128 * 8 * 1024)));
+        assert!(iter.next() == Some((128 * 44 * 1024, 128 * 8 * 1024)));
+    }
+
     #[tokio::test]
     async fn download_file() {
         let file_key = FileKey {
@@ -122,7 +167,7 @@ mod test {
             .as_ref()
             .expect("missing download url");
         {
-            let response = client
+            let mut response = client
                 .client
                 .get(download_url.as_str())
                 .send()
@@ -130,19 +175,35 @@ mod test {
                 .expect("failed to send")
                 .error_for_status()
                 .expect("invalid status");
-            let mut bytes = response
-                .bytes()
-                .await
-                .expect("failed to get bytes")
-                .to_vec();
 
             let mut cipher = Aes128Ctr128BE::new(
                 &file_key.key.to_ne_bytes().into(),
                 &file_key.iv.to_ne_bytes().into(),
             );
-            cipher.apply_keystream(&mut bytes);
+            let mut chunk_iter = ChunkIter::new();
+            let mut buffer = Vec::with_capacity(1024 * 1024);
+            let (_chunk_offset, chunk_size) = chunk_iter.next().unwrap();
+            let mut output: Vec<u8> = Vec::with_capacity(1024 * 1024);
+            while let Some(chunk) = response.chunk().await.expect("failed to get chunk") {
+                let mut chunk = chunk.as_ref();
 
-            assert!(bytes == TEST_FILE_BYTES);
+                while buffer.len() + chunk.len() >= chunk_size.try_into().unwrap() {
+                    let to_read = usize::try_from(chunk_size).unwrap() - buffer.len();
+                    buffer.extend(&chunk[..to_read]);
+                    cipher.apply_keystream(&mut buffer);
+                    output.extend(&buffer);
+                    buffer.clear();
+                    chunk = &chunk[to_read..];
+                }
+                buffer.extend(chunk);
+            }
+            if !buffer.is_empty() {
+                cipher.apply_keystream(&mut buffer);
+                output.extend(&buffer);
+                buffer.clear();
+            }
+
+            assert!(output == TEST_FILE_BYTES);
         }
     }
 }
