@@ -1,5 +1,6 @@
 use crate::Command;
 use crate::Error;
+use crate::FetchNodesResponse;
 use crate::GetAttributesResponse;
 use crate::ResponseData;
 use std::future::Future;
@@ -84,7 +85,7 @@ impl Client {
         });
     }
 
-    /// Get attributes for a file
+    /// Get attributes for a file.
     pub fn get_attributes(
         &self,
         file_id: &str,
@@ -106,6 +107,28 @@ impl Client {
 
             Ok(response)
         }
+    }
+
+    /// Get the nodes for a folder node.
+    ///
+    /// This bypasses the command buffering system as it is more efficient for Mega's servers to process this alone.
+    pub async fn fetch_nodes(&self) -> Result<FetchNodesResponse, Error> {
+        let command = Command::FetchNodes { c: 1, r: 1 };
+        let mut response = self
+            .client
+            .execute_commands(std::slice::from_ref(&command), None)
+            .await?;
+        // The low-level api client ensures that the number of returned responses matches the number of input commands.
+        let response = response.pop().unwrap();
+        let response = response.into_result().map_err(Error::from)?;
+        let response = match response {
+            ResponseData::FetchNodes(response) => response,
+            _ => {
+                return Err(Error::UnexpectedResponseDataType);
+            }
+        };
+
+        Ok(response)
     }
 }
 

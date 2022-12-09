@@ -8,6 +8,7 @@ pub use self::client::Client;
 pub use self::easy::Client as EasyClient;
 pub use self::types::Command;
 pub use self::types::ErrorCode;
+pub use self::types::FetchNodesResponse;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
 pub use self::types::FolderKey;
