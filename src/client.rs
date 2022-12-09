@@ -35,7 +35,11 @@ impl Client {
         commands: &[Command],
         node: Option<&str>,
     ) -> Result<Vec<Response<ResponseData>>, Error> {
-        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % 100_000;
+        const MAX_RETRIES: usize = 3;
+        const BASE_DELAY: u64 = 250;
+        const MAX_SEQUENCE_ID: u64 = 100_000;
+
+        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % MAX_SEQUENCE_ID;
         let mut url = Url::parse_with_params(
             "https://g.api.mega.co.nz/cs",
             &[("id", itoa::Buffer::new().format(id))],
@@ -60,8 +64,8 @@ impl Client {
                 .await?;
             let response = response.into_result();
 
-            if retries < 3 && matches!(response, Err(ErrorCode::EAGAIN)) {
-                let millis = 250 * (1 << retries);
+            if retries < MAX_RETRIES && matches!(response, Err(ErrorCode::EAGAIN)) {
+                let millis = BASE_DELAY * (1 << retries);
                 tokio::time::sleep(Duration::from_millis(millis)).await;
                 retries += 1;
                 continue;
