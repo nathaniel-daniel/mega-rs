@@ -1,10 +1,13 @@
 use crate::Command;
 use crate::Error;
+use crate::ErrorCode;
 use crate::Response;
 use crate::ResponseData;
+use rand::Rng;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::time::Duration;
 use url::Url;
 
 /// A client
@@ -22,7 +25,7 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            sequence_id: Arc::new(AtomicU64::new(1)),
+            sequence_id: Arc::new(AtomicU64::new(rand::thread_rng().gen())),
         }
     }
 
@@ -32,7 +35,7 @@ impl Client {
         commands: &[Command],
         node: Option<&str>,
     ) -> Result<Vec<Response<ResponseData>>, Error> {
-        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % 100_000;
         let mut url = Url::parse_with_params(
             "https://g.api.mega.co.nz/cs",
             &[("id", itoa::Buffer::new().format(id))],
@@ -43,15 +46,31 @@ impl Client {
                 query_pairs.append_pair("n", node);
             }
         }
-        let response: Vec<_> = self
-            .client
-            .post(url)
-            .json(commands)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+
+        let mut retries = 0;
+        let response = loop {
+            let response: Response<Vec<_>> = self
+                .client
+                .post(url.as_str())
+                .json(commands)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            let response = response.into_result();
+
+            if retries < 3 && matches!(response, Err(ErrorCode::EAGAIN)) {
+                let millis = 250 * (1 << retries);
+                tokio::time::sleep(Duration::from_millis(millis)).await;
+                retries += 1;
+                continue;
+            }
+
+            break response;
+        };
+        let response = response?;
+
         let commands_len = commands.len();
         let response_len = response.len();
         if response_len != commands_len {
@@ -60,6 +79,7 @@ impl Client {
                 actual: response_len,
             });
         }
+
         Ok(response)
     }
 }

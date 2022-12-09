@@ -1,5 +1,6 @@
 use crate::Command;
 use crate::Error;
+use crate::FetchNodesResponse;
 use crate::GetAttributesResponse;
 use crate::ResponseData;
 use std::future::Future;
@@ -84,7 +85,7 @@ impl Client {
         });
     }
 
-    /// Get attributes for a file
+    /// Get attributes for a file.
     pub fn get_attributes(
         &self,
         file_id: &str,
@@ -106,6 +107,29 @@ impl Client {
 
             Ok(response)
         }
+    }
+
+    /// Get the nodes for a folder node.
+    ///
+    /// This bypasses the command buffering system as it is more efficient for Mega's servers to process this alone.
+    pub async fn fetch_nodes(&self, node_id: Option<&str>) -> Result<FetchNodesResponse, Error> {
+        let command = Command::FetchNodes { c: 1, r: 1 };
+        let mut response = self
+            .client
+            .execute_commands(std::slice::from_ref(&command), node_id)
+            .await?;
+
+        // The low-level api client ensures that the number of returned responses matches the number of input commands.
+        let response = response.pop().unwrap();
+        let response = response.into_result().map_err(Error::from)?;
+        let response = match response {
+            ResponseData::FetchNodes(response) => response,
+            _ => {
+                return Err(Error::UnexpectedResponseDataType);
+            }
+        };
+
+        Ok(response)
     }
 }
 
@@ -180,6 +204,7 @@ impl<E> Clone for ArcError<E> {
 mod test {
     use super::*;
     use crate::test::*;
+    use crate::FolderKey;
 
     #[tokio::test]
     async fn get_attributes() {
@@ -204,5 +229,31 @@ mod test {
             .decode_attributes(TEST_FILE_KEY_KEY_DECODED)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "Doxygen_docs.zip");
+    }
+
+    #[tokio::test]
+    async fn fetch_nodes() {
+        let folder_key = FolderKey(TEST_FOLDER_KEY_DECODED);
+
+        let client = Client::new();
+        let response = client
+            .fetch_nodes(Some(TEST_FOLDER_ID))
+            .await
+            .expect("failed to fetch nodes");
+        assert!(response.files.len() == 3);
+        let file_attributes = response.files[0]
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "test");
+
+        let file_attributes = dbg!(&response.files[1])
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "test.txt");
+
+        let file_attributes = dbg!(&response.files[2])
+            .decode_attributes(&folder_key)
+            .expect("failed to decode attributes");
+        assert!(file_attributes.name == "testfolder");
     }
 }
