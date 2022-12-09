@@ -2,6 +2,7 @@ use crate::Command;
 use crate::Error;
 use crate::Response;
 use crate::ResponseData;
+use rand::Rng;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -22,7 +23,7 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            sequence_id: Arc::new(AtomicU64::new(1)),
+            sequence_id: Arc::new(AtomicU64::new(rand::thread_rng().gen())),
         }
     }
 
@@ -32,7 +33,7 @@ impl Client {
         commands: &[Command],
         node: Option<&str>,
     ) -> Result<Vec<Response<ResponseData>>, Error> {
-        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % 100_000;
         let mut url = Url::parse_with_params(
             "https://g.api.mega.co.nz/cs",
             &[("id", itoa::Buffer::new().format(id))],
