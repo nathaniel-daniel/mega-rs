@@ -167,7 +167,7 @@ mod test {
             .as_ref()
             .expect("missing download url");
         {
-            let response = client
+            let mut response = client
                 .client
                 .get(download_url.as_str())
                 .send()
@@ -175,19 +175,35 @@ mod test {
                 .expect("failed to send")
                 .error_for_status()
                 .expect("invalid status");
-            let mut bytes = response
-                .bytes()
-                .await
-                .expect("failed to get bytes")
-                .to_vec();
 
             let mut cipher = Aes128Ctr128BE::new(
                 &file_key.key.to_ne_bytes().into(),
                 &file_key.iv.to_ne_bytes().into(),
             );
-            cipher.apply_keystream(&mut bytes);
+            let mut chunk_iter = ChunkIter::new();
+            let mut buffer = Vec::with_capacity(1024 * 1024);
+            let (_chunk_offset, chunk_size) = chunk_iter.next().unwrap();
+            let mut output: Vec<u8> = Vec::with_capacity(1024 * 1024);
+            while let Some(chunk) = response.chunk().await.expect("failed to get chunk") {
+                let mut chunk = chunk.as_ref();
 
-            assert!(bytes == TEST_FILE_BYTES);
+                while buffer.len() + chunk.len() >= chunk_size.try_into().unwrap() {
+                    let to_read = usize::try_from(chunk_size).unwrap() - buffer.len();
+                    buffer.extend(&chunk[..to_read]);
+                    cipher.apply_keystream(&mut buffer);
+                    output.extend(&buffer);
+                    buffer.clear();
+                    chunk = &chunk[to_read..];
+                }
+                buffer.extend(chunk);
+            }
+            if !buffer.is_empty() {
+                cipher.apply_keystream(&mut buffer);
+                output.extend(&buffer);
+                buffer.clear();
+            }
+
+            assert!(output == TEST_FILE_BYTES);
         }
     }
 }
