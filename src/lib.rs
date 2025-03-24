@@ -126,6 +126,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::erasing_op, clippy::identity_op)]
     fn chunk_iter() {
         let mut iter = ChunkIter::new();
         assert!(iter.next() == Some((128 * 0 * 2014, 128 * 1 * 1024)));
@@ -178,7 +179,7 @@ mod test {
                 .error_for_status()
                 .expect("invalid status");
 
-            let mut file_mac = file_key.iv << 64 | file_key.iv;
+            let mut file_mac = (file_key.iv << 64) | file_key.iv;
             let mut cipher = Aes128Ctr128BE::new(
                 &file_key.key.to_be_bytes().into(),
                 &file_key.iv.to_be_bytes().into(),
