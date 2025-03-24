@@ -180,18 +180,29 @@ mod test {
             _ => panic!("unexpected response"),
         };
         assert!(response.files.len() == 3);
-        let file_attributes = response.files[0]
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "oLkVhYqA")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
 
-        let file_attributes = dbg!(&response.files[2])
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "kalwUahb")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
-        dbg!(&file_attributes);
         assert!(file_attributes.name == "test.txt");
 
-        let file_attributes = dbg!(&response.files[1])
+        let file_attributes = &response
+            .files
+            .iter()
+            .find(|file| file.id == "IGlBlD6K")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");
