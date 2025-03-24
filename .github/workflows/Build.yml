@@ -7,8 +7,7 @@ name: Rust
     branches:
       - master
 jobs:
-  Lint:
-    name: Lint
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,7 +22,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-lint-cargo-${{ hashFiles('**/Cargo.lock') }}
           
       - name: Fmt
         run: cargo fmt --all -- --check
@@ -31,16 +30,16 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests --all --all-features -- -D warnings
           
-  Deny:
+  deny:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         
       - name: Deny
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v2
         
-  Build:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,7 +54,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
           
       - name: Build
         run: cargo build --verbose
