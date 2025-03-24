@@ -160,8 +160,8 @@ impl Client {
             .error_for_status()?;
 
         let mut cipher = Aes128Ctr128BE::new(
-            &file_key.key.to_ne_bytes().into(),
-            &file_key.iv.to_ne_bytes().into(),
+            &file_key.key.to_be_bytes().into(),
+            &file_key.iv.to_be_bytes().into(),
         );
 
         Ok(response.bytes_stream().map(move |chunk| {
@@ -273,6 +273,8 @@ mod test {
         client.send_commands();
         let attributes = attributes.await.expect("failed to get attributes");
         let url = attributes.download_url.expect("missing download url");
+        // dbg!(url.as_str());
+        // todo!();
         let mut stream = client
             .download_file_no_verify(&file_key, url.as_str())
             .await
@@ -287,5 +289,7 @@ mod test {
             file.extend(chunk);
         }
         assert!(file == TEST_FILE_BYTES);
+
+        std::fs::write("out.bin", file);
     }
 }

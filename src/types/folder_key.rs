@@ -46,7 +46,7 @@ impl std::str::FromStr for FolderKey {
         }
 
         // Length check is done earlier
-        let key = u128::from_ne_bytes(input.try_into().unwrap());
+        let key = u128::from_be_bytes(input.try_into().unwrap());
 
         Ok(Self(key))
     }

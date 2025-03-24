@@ -68,14 +68,14 @@ mod test {
     pub const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_ID: &str = "MWsm3aBL";
 
-    pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_ne_bytes([
+    pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_be_bytes([
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
     ]);
     pub const TEST_FILE_KEY_IV_DECODED: u128 =
-        u128::from_ne_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
+        u128::from_be_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
     pub const TEST_FILE_META_MAC_DECODED: u64 =
-        u64::from_ne_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
-    pub const TEST_FOLDER_KEY_DECODED: u128 = u128::from_ne_bytes([
+        u64::from_be_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
+    pub const TEST_FOLDER_KEY_DECODED: u128 = u128::from_be_bytes([
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ]);
 
@@ -128,8 +128,8 @@ mod test {
     #[test]
     fn chunk_iter() {
         let mut iter = ChunkIter::new();
-        assert!(iter.next() == Some((0, 128 * 1024)));
-        assert!(iter.next() == Some((128 * 1024, 128 * 2 * 1024)));
+        assert!(iter.next() == Some((128 * 0 * 2014, 128 * 1 * 1024)));
+        assert!(iter.next() == Some((128 * 1 * 1024, 128 * 2 * 1024)));
         assert!(iter.next() == Some((128 * 3 * 1024, 128 * 3 * 1024)));
         assert!(iter.next() == Some((128 * 6 * 1024, 128 * 4 * 1024)));
         assert!(iter.next() == Some((128 * 10 * 1024, 128 * 5 * 1024)));
@@ -178,10 +178,11 @@ mod test {
                 .error_for_status()
                 .expect("invalid status");
 
-            let mut file_mac = 0u128;
+            /*
+            let mut file_mac = file_key.iv << 64 | file_key.iv;
             let mut cipher = Aes128Ctr128BE::new(
-                &file_key.key.to_ne_bytes().into(),
-                &file_key.iv.to_ne_bytes().into(),
+                &file_key.key.to_be_bytes().into(),
+                &file_key.iv.to_be_bytes().into(),
             );
             let mut chunk_iter = ChunkIter::new();
             let mut buffer = Vec::with_capacity(1024 * 1024);
@@ -196,27 +197,27 @@ mod test {
                     cipher.apply_keystream(&mut buffer);
                     let mut chunk_mac = file_key.iv;
                     for block in buffer.chunks(16) {
-                        let block = u128::from_ne_bytes(block.try_into().unwrap());
+                        let block = u128::from_be_bytes(block.try_into().unwrap());
                         chunk_mac ^= block;
                         let cipher =
-                            Aes128CbcEnc::new(&file_key.key.to_ne_bytes().into(), &[0; 16].into());
-                        let mut chunk_mac_bytes = chunk_mac.to_ne_bytes();
+                            Aes128CbcEnc::new(&file_key.key.to_be_bytes().into(), &[0; 16].into());
+                        let mut chunk_mac_bytes = chunk_mac.to_be_bytes();
                         let chunk_mac_bytes = cipher
                             .encrypt_padded_mut::<block_padding::NoPadding>(
                                 &mut chunk_mac_bytes,
                                 16,
                             )
                             .unwrap();
-                        chunk_mac = u128::from_ne_bytes(chunk_mac_bytes.try_into().unwrap());
+                        chunk_mac = u128::from_be_bytes(chunk_mac_bytes.try_into().unwrap());
                     }
                     file_mac ^= chunk_mac;
                     let cipher =
-                        Aes128CbcEnc::new(&file_key.key.to_ne_bytes().into(), &[0; 16].into());
-                    let mut file_mac_bytes = file_mac.to_ne_bytes();
+                        Aes128CbcEnc::new(&file_key.key.to_be_bytes().into(), &[0; 16].into());
+                    let mut file_mac_bytes = file_mac.to_be_bytes();
                     let file_mac_bytes = cipher
                         .encrypt_padded_mut::<block_padding::NoPadding>(&mut file_mac_bytes, 16)
                         .unwrap();
-                    file_mac = u128::from_ne_bytes(file_mac_bytes.try_into().unwrap());
+                    file_mac = u128::from_be_bytes(file_mac_bytes.try_into().unwrap());
 
                     output.extend(&buffer);
                     buffer.clear();
@@ -230,36 +231,36 @@ mod test {
                 cipher.apply_keystream(&mut buffer);
                 let mut chunk_mac = file_key.iv;
                 for block in buffer.chunks(16) {
-                    let block = u128::from_ne_bytes(block.try_into().unwrap());
+                    let block = u128::from_be_bytes(block.try_into().unwrap());
                     chunk_mac ^= block;
                     let cipher =
-                        Aes128CbcEnc::new(&file_key.key.to_ne_bytes().into(), &[0; 16].into());
-                    let mut chunk_mac_bytes = chunk_mac.to_ne_bytes();
+                        Aes128CbcEnc::new(&file_key.key.to_be_bytes().into(), &[0; 16].into());
+                    let mut chunk_mac_bytes = chunk_mac.to_be_bytes();
                     let chunk_mac_bytes = cipher
                         .encrypt_padded_mut::<block_padding::NoPadding>(&mut chunk_mac_bytes, 16)
                         .unwrap();
-                    chunk_mac = u128::from_ne_bytes(chunk_mac_bytes.try_into().unwrap());
+                    chunk_mac = u128::from_be_bytes(chunk_mac_bytes.try_into().unwrap());
                 }
                 file_mac ^= chunk_mac;
-                let cipher = Aes128CbcEnc::new(&file_key.key.to_ne_bytes().into(), &[0; 16].into());
-                let mut file_mac_bytes = file_mac.to_ne_bytes();
+                let cipher = Aes128CbcEnc::new(&file_key.key.to_be_bytes().into(), &[0; 16].into());
+                let mut file_mac_bytes = file_mac.to_be_bytes();
                 let file_mac_bytes = cipher
                     .encrypt_padded_mut::<block_padding::NoPadding>(&mut file_mac_bytes, 16)
                     .unwrap();
-                file_mac = u128::from_ne_bytes(file_mac_bytes.try_into().unwrap());
+                file_mac = u128::from_be_bytes(file_mac_bytes.try_into().unwrap());
 
                 output.extend(&buffer);
                 buffer.clear();
             }
 
-            let file_mac_bytes = file_mac.to_ne_bytes();
-            let file_mac_1 = u32::from_ne_bytes(file_mac_bytes[..4].try_into().unwrap());
-            let file_mac_2 = u32::from_ne_bytes(file_mac_bytes[4..8].try_into().unwrap());
-            let file_mac_3 = u32::from_ne_bytes(file_mac_bytes[8..12].try_into().unwrap());
-            let file_mac_4 = u32::from_ne_bytes(file_mac_bytes[12..].try_into().unwrap());
-            let file_mac_1 = (file_mac_1 ^ file_mac_2).to_ne_bytes();
-            let file_mac_2 = (file_mac_3 ^ file_mac_4).to_ne_bytes();
-            let file_mac = u64::from_ne_bytes([
+            let file_mac_bytes = file_mac.to_be_bytes();
+            let file_mac_1 = u32::from_be_bytes(file_mac_bytes[..4].try_into().unwrap());
+            let file_mac_2 = u32::from_be_bytes(file_mac_bytes[4..8].try_into().unwrap());
+            let file_mac_3 = u32::from_be_bytes(file_mac_bytes[8..12].try_into().unwrap());
+            let file_mac_4 = u32::from_be_bytes(file_mac_bytes[12..].try_into().unwrap());
+            let file_mac_1 = (file_mac_1 ^ file_mac_2).to_be_bytes();
+            let file_mac_2 = (file_mac_3 ^ file_mac_4).to_be_bytes();
+            let file_mac = u64::from_be_bytes([
                 file_mac_1[0],
                 file_mac_1[1],
                 file_mac_1[2],
@@ -270,6 +271,8 @@ mod test {
                 file_mac_2[3],
             ]);
             dbg!(file_key.meta_mac, file_mac);
+            */
+
             assert!(output == TEST_FILE_BYTES);
         }
     }

@@ -1,2 +1,6 @@
 /target
+
 test.py
+test-chunk.py
+out.bin
+out.zip

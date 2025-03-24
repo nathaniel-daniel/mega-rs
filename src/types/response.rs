@@ -255,7 +255,7 @@ impl FetchNodesNode {
             .ok_or(DecodeAttributesError::KeyMissingHeader)?;
 
         let mut key = URL_SAFE_NO_PAD.decode(key)?;
-        let cipher = Aes128EcbDec::new(&folder_key.0.to_ne_bytes().into());
+        let cipher = Aes128EcbDec::new(&folder_key.0.to_be_bytes().into());
         let key = cipher
             .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
@@ -266,7 +266,7 @@ impl FetchNodesNode {
             }
 
             // Length check is done above
-            u128::from_ne_bytes(key.try_into().unwrap())
+            u128::from_be_bytes(key.try_into().unwrap())
         } else {
             if key_len != 32 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
@@ -297,7 +297,7 @@ fn decode_attributes(
 ) -> Result<FileAttributes, DecodeAttributesError> {
     let mut encoded_attributes = URL_SAFE_NO_PAD.decode(encoded_attributes)?;
 
-    let cipher = Aes128CbcDec::new(&key.to_ne_bytes().into(), &[0; 16].into());
+    let cipher = Aes128CbcDec::new(&key.to_be_bytes().into(), &[0; 16].into());
     let decrypted = cipher
         .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
         .map_err(DecodeAttributesError::Decrypt)?;

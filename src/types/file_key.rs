@@ -40,14 +40,14 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    /// Make a FileKey from encoded bytes
+    /// Make a FileKey from encoded bytes.
     pub(crate) fn from_encoded_bytes(input: &[u8; KEY_SIZE * 2]) -> Self {
         let key = {
             let (n1, n2) = input.split_at(KEY_SIZE);
 
             // Lengths are verified via split above and the function array size limit
-            let n1 = u128::from_ne_bytes(n1.try_into().unwrap());
-            let n2 = u128::from_ne_bytes(n2.try_into().unwrap());
+            let n1 = u128::from_be_bytes(n1.try_into().unwrap());
+            let n2 = u128::from_be_bytes(n2.try_into().unwrap());
 
             n1 ^ n2
         };
@@ -55,10 +55,10 @@ impl FileKey {
         let (iv, meta_mac) = input[KEY_SIZE..].split_at(std::mem::size_of::<u64>());
 
         // Length is verified by split above.
-        let iv = u128::from(u64::from_ne_bytes(iv.try_into().unwrap()));
+        let iv = u128::from(u64::from_be_bytes(iv.try_into().unwrap())) << 64;
 
-        // Length is verified by split and length of input
-        let meta_mac = u64::from_ne_bytes(meta_mac.try_into().unwrap());
+        // Length is verified by split and length of input.
+        let meta_mac = u64::from_be_bytes(meta_mac.try_into().unwrap());
 
         Self { key, iv, meta_mac }
     }
