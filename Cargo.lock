@@ -711,6 +711,7 @@ dependencies = [
  "ctr",
  "ecb",
  "itoa",
+ "pin-project-lite",
  "rand",
  "reqwest",
  "serde",
@@ -719,6 +720,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "url",
 ]
 

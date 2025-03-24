@@ -9,11 +9,18 @@ use crate::GetAttributesResponse;
 use crate::ResponseData;
 use cbc::cipher::KeyIvInit;
 use cbc::cipher::StreamCipher;
+use pin_project_lite::pin_project;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tokio_stream::Stream;
+use std::task::Context;
+use std::task::Poll;
+use std::task::ready;
+use tokio::io::AsyncRead;
+use tokio::io::ReadBuf;
 use tokio_stream::StreamExt;
+use tokio_util::io::StreamReader;
 
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
@@ -150,7 +157,7 @@ impl Client {
         &self,
         file_key: &FileKey,
         url: &str,
-    ) -> Result<impl Stream<Item = Result<Vec<u8>, Error>>, Error> {
+    ) -> Result<impl AsyncRead, Error> {
         let response = self
             .client
             .client
@@ -159,22 +166,19 @@ impl Client {
             .await?
             .error_for_status()?;
 
-        let mut cipher = Aes128Ctr128BE::new(
-            &file_key.key.to_be_bytes().into(),
-            &file_key.iv.to_be_bytes().into(),
+        let stream_reader = StreamReader::new(
+            response
+                .bytes_stream()
+                .map(|result| result.map_err(std::io::Error::other)),
         );
 
-        Ok(response.bytes_stream().map(move |chunk| {
-            chunk
-                .map(|chunk| {
-                    // TODO: Consider moving to blocking thread
-                    // This takes around 0.5-1.5 milliseconds on my laptop, making this borderline.
-                    let mut chunk = chunk.to_vec();
-                    cipher.apply_keystream(&mut chunk);
-                    chunk
-                })
-                .map_err(Error::from)
-        }))
+        let reader = DownloadNoValidateReader::new(
+            stream_reader,
+            file_key.key.to_be_bytes(),
+            file_key.iv.to_be_bytes(),
+        );
+
+        Ok(reader)
     }
 }
 
@@ -189,6 +193,57 @@ impl Default for Client {
 struct State {
     buffered_commands: Vec<Command>,
     buffered_tx: Vec<tokio::sync::oneshot::Sender<Result<ResponseData, Error>>>,
+}
+
+pin_project! {
+    struct DownloadNoValidateReader<R> {
+        #[pin]
+        reader: R,
+        cipher: Aes128Ctr128BE,
+    }
+}
+
+impl<R> DownloadNoValidateReader<R> {
+    fn new(reader: R, key: [u8; 16], iv: [u8; 16]) -> Self {
+        let cipher = Aes128Ctr128BE::new(&key.into(), &iv.into());
+
+        Self { reader, cipher }
+    }
+}
+
+impl<R> AsyncRead for DownloadNoValidateReader<R>
+where
+    R: AsyncRead,
+{
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        // See: https://users.rust-lang.org/t/blocking-permit/36865/5
+        const MAX_LEN: usize = 64 * 1024;
+
+        let this = self.as_mut().project();
+
+        // Safety: We never uninit bytes.
+        let unfilled_slice = unsafe {
+            let slice = buf.unfilled_mut();
+            let len = std::cmp::min(slice.len(), MAX_LEN);
+
+            &mut slice[..len]
+        };
+        let mut unfilled_buf = ReadBuf::uninit(unfilled_slice);
+
+        let result = ready!(this.reader.poll_read(cx, &mut unfilled_buf));
+        result?;
+
+        let new_bytes = unfilled_buf.filled_mut();
+        this.cipher.apply_keystream(new_bytes);
+        let new_bytes_len = new_bytes.len();
+        buf.advance(new_bytes_len);
+
+        Poll::Ready(Ok(()))
+    }
 }
 
 #[cfg(test)]
@@ -275,21 +330,15 @@ mod test {
         let url = attributes.download_url.expect("missing download url");
         // dbg!(url.as_str());
         // todo!();
-        let mut stream = client
+        let mut reader = client
             .download_file_no_verify(&file_key, url.as_str())
             .await
             .expect("failed to get download stream");
         let mut file = Vec::with_capacity(1024 * 1024);
-        while let Some(chunk) = stream
-            .next()
+        tokio::io::copy(&mut reader, &mut file)
             .await
-            .transpose()
-            .expect("failed to get next chunk")
-        {
-            file.extend(chunk);
-        }
-        assert!(file == TEST_FILE_BYTES);
+            .expect("failed to copy");
 
-        std::fs::write("out.bin", file);
+        assert!(file == TEST_FILE_BYTES);
     }
 }

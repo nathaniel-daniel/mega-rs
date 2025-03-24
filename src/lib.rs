@@ -178,7 +178,6 @@ mod test {
                 .error_for_status()
                 .expect("invalid status");
 
-            /*
             let mut file_mac = file_key.iv << 64 | file_key.iv;
             let mut cipher = Aes128Ctr128BE::new(
                 &file_key.key.to_be_bytes().into(),
@@ -271,7 +270,6 @@ mod test {
                 file_mac_2[3],
             ]);
             dbg!(file_key.meta_mac, file_mac);
-            */
 
             assert!(output == TEST_FILE_BYTES);
         }
