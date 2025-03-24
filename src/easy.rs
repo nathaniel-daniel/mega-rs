@@ -194,8 +194,8 @@ struct State {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test::*;
     use crate::FolderKey;
+    use crate::test::*;
 
     #[tokio::test]
     async fn get_attributes() {
