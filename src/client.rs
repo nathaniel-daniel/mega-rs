@@ -185,12 +185,13 @@ mod test {
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
 
-        let file_attributes = dbg!(&response.files[1])
+        let file_attributes = dbg!(&response.files[2])
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
+        dbg!(&file_attributes);
         assert!(file_attributes.name == "test.txt");
 
-        let file_attributes = dbg!(&response.files[2])
+        let file_attributes = dbg!(&response.files[1])
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");

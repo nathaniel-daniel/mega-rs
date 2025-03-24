@@ -172,6 +172,33 @@ pub enum FetchNodesNodeKind {
     TrashBin = 4,
 }
 
+impl FetchNodesNodeKind {
+    /// Returns true if this is a file.
+    pub fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+
+    /// Returns true if this is a dir.
+    pub fn is_dir(self) -> bool {
+        matches!(self, Self::Directory)
+    }
+
+    /// Returns true if this is a root.
+    pub fn is_root(self) -> bool {
+        matches!(self, Self::Root)
+    }
+
+    /// Returns true if this is an inbox.
+    pub fn is_inbox(self) -> bool {
+        matches!(self, Self::Inbox)
+    }
+
+    /// Returns true if this is a trash bin.
+    pub fn is_trash_bin(self) -> bool {
+        matches!(self, Self::TrashBin)
+    }
+}
+
 /// A FetchNodes Node
 #[derive(Debug, serde::Serialize, serde:: Deserialize)]
 pub struct FetchNodesNode {
@@ -248,6 +275,16 @@ impl FetchNodesNode {
         };
 
         decode_attributes(&self.encoded_attributes, key)
+    }
+
+    /// Check if this is a file.
+    pub fn is_file(&self) -> bool {
+        self.kind.is_file()
+    }
+
+    /// Check if this is a dir.
+    pub fn is_dir(&self) -> bool {
+        self.kind.is_dir()
     }
 }
 

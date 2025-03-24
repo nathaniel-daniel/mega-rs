@@ -9,7 +9,7 @@ pub enum Command {
         #[serde(rename = "p")]
         file_id: String,
 
-        ///  Set to Some(1) to include the download url in the response.
+        /// Set to Some(1) to include the download url in the response.
         #[serde(rename = "g")]
         include_download_url: Option<u8>,
     },
