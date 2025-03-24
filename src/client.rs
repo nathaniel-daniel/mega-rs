@@ -3,7 +3,6 @@ use crate::Error;
 use crate::ErrorCode;
 use crate::Response;
 use crate::ResponseData;
-use rand::Rng;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -25,7 +24,7 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            sequence_id: Arc::new(AtomicU64::new(rand::thread_rng().gen())),
+            sequence_id: Arc::new(AtomicU64::new(rand::random())),
         }
     }
 
