@@ -1,11 +1,13 @@
 mod client;
 #[cfg(feature = "easy")]
 mod easy;
+mod file_validator;
 mod types;
 
 pub use self::client::Client;
 #[cfg(feature = "easy")]
 pub use self::easy::Client as EasyClient;
+pub use self::file_validator::FileValidator;
 pub use self::types::Command;
 pub use self::types::ErrorCode;
 pub use self::types::FetchNodesResponse;
@@ -29,7 +31,7 @@ pub enum Error {
     Url(#[from] url::ParseError),
 
     /// The returned number of responses did not match what was expected
-    #[error("expected '{expected}' responses, but got '{actual}'")]
+    #[error("expected \"{expected}\" responses, but got \"{actual}\"")]
     ResponseLengthMismatch { expected: usize, actual: usize },
 
     /// There was an api error
@@ -136,11 +138,15 @@ mod test {
         );
 
         let mut output = Vec::new();
+        let mut validator = FileValidator::new(file_key.clone());
         while let Some(chunk) = response.chunk().await.expect("failed to get chunk") {
             let old_len = output.len();
             output.extend(&chunk);
             cipher.apply_keystream(&mut output[old_len..]);
         }
         assert!(output == TEST_FILE_BYTES);
+
+        validator.feed(&output);
+        validator.finish().expect("validation failed");
     }
 }
