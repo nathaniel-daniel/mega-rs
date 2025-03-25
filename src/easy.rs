@@ -1,8 +1,7 @@
 mod reader;
 mod util;
 
-use self::reader::DownloadNoValidateReader;
-use self::reader::DownloadValidateReader;
+use self::reader::FileDownloadReader;
 pub use self::util::ArcError;
 use crate::Command;
 use crate::Error;
@@ -165,7 +164,7 @@ impl Client {
                 .map(|result| result.map_err(std::io::Error::other)),
         );
 
-        let reader = DownloadNoValidateReader::new(stream_reader, file_key);
+        let reader = FileDownloadReader::new(stream_reader, file_key, false);
 
         Ok(reader)
     }
@@ -195,7 +194,7 @@ impl Client {
                 .map(|result| result.map_err(std::io::Error::other)),
         );
 
-        let reader = DownloadValidateReader::new(stream_reader, file_key);
+        let reader = FileDownloadReader::new(stream_reader, file_key, true);
 
         Ok(reader)
     }

@@ -13,84 +13,37 @@ use tokio::io::ReadBuf;
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
 pin_project! {
-    /// A reader for a file that does not validate its contents.
-    pub struct DownloadNoValidateReader<R> {
+    /// A reader for a file.
+    pub struct FileDownloadReader<R> {
         #[pin]
         reader: R,
         cipher: Aes128Ctr128BE,
+        validator: Option<FileValidator>,
     }
 }
 
-impl<R> DownloadNoValidateReader<R> {
+impl<R> FileDownloadReader<R> {
     /// Make a new reader.
-    pub(crate) fn new(reader: R, file_key: &FileKey) -> Self {
+    pub(crate) fn new(reader: R, file_key: &FileKey, validate: bool) -> Self {
         let cipher = Aes128Ctr128BE::new(
             &file_key.key.to_be_bytes().into(),
             &file_key.iv.to_be_bytes().into(),
         );
-
-        Self { reader, cipher }
-    }
-}
-
-impl<R> AsyncRead for DownloadNoValidateReader<R>
-where
-    R: AsyncRead,
-{
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        // See: https://users.rust-lang.org/t/blocking-permit/36865/5
-        const MAX_LEN: usize = 64 * 1024;
-
-        let this = self.as_mut().project();
-
-        // Limit max chunk processed at a time to avoid blocking.
-        let mut unfilled_buf = buf.take(MAX_LEN);
-
-        let result = ready!(this.reader.poll_read(cx, &mut unfilled_buf));
-        result?;
-
-        let new_bytes = unfilled_buf.filled_mut();
-        this.cipher.apply_keystream(new_bytes);
-        let new_bytes_len = new_bytes.len();
-        buf.advance(new_bytes_len);
-
-        Poll::Ready(Ok(()))
-    }
-}
-
-pin_project! {
-     /// A reader for a file that validates its contents.
-    pub struct DownloadValidateReader<R> {
-        #[pin]
-        reader: R,
-        cipher: Aes128Ctr128BE,
-        validator: FileValidator,
-    }
-}
-
-impl<R> DownloadValidateReader<R> {
-    /// Create a new reader.
-    pub(crate) fn new(reader: R, file_key: &FileKey) -> Self {
-        let cipher = Aes128Ctr128BE::new(
-            &file_key.key.to_be_bytes().into(),
-            &file_key.iv.to_be_bytes().into(),
-        );
-        let validator = FileValidator::new(file_key.clone());
+        let validator = if validate {
+            Some(FileValidator::new(file_key.clone()))
+        } else {
+            None
+        };
 
         Self {
             reader,
             cipher,
-
             validator,
         }
     }
 }
 
-impl<R> AsyncRead for DownloadValidateReader<R>
+impl<R> AsyncRead for FileDownloadReader<R>
 where
     R: AsyncRead,
 {
@@ -113,12 +66,14 @@ where
         let new_bytes = unfilled_buf.filled_mut();
         this.cipher.apply_keystream(new_bytes);
         let new_bytes_len = new_bytes.len();
-        if new_bytes_len == 0 {
-            this.validator.finish().map_err(std::io::Error::other)?;
-        } else {
-            this.validator.feed(new_bytes);
-            buf.advance(new_bytes_len);
+        if let Some(validator) = this.validator.as_mut() {
+            if new_bytes_len == 0 {
+                validator.finish().map_err(std::io::Error::other)?;
+            } else {
+                validator.feed(new_bytes);
+            }
         }
+        buf.advance(new_bytes_len);
 
         Poll::Ready(Ok(()))
     }
