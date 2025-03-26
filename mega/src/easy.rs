@@ -1,7 +1,7 @@
 mod reader;
 mod util;
 
-use self::reader::FileDownloadReader;
+pub use self::reader::FileDownloadReader;
 pub use self::util::ArcError;
 use crate::Command;
 use crate::Error;
@@ -10,6 +10,7 @@ use crate::FileKey;
 use crate::GetAttributesResponse;
 use crate::ResponseData;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::io::AsyncRead;
@@ -149,7 +150,7 @@ impl Client {
         &self,
         file_key: &FileKey,
         url: &str,
-    ) -> Result<impl AsyncRead, Error> {
+    ) -> Result<FileDownloadReader<Pin<Box<dyn AsyncRead + Send + Sync>>>, Error> {
         let response = self
             .client
             .client
@@ -163,6 +164,8 @@ impl Client {
                 .bytes_stream()
                 .map(|result| result.map_err(std::io::Error::other)),
         );
+        let stream_reader =
+            Box::into_pin(Box::new(stream_reader) as Box<dyn AsyncRead + Send + Sync>);
 
         let reader = FileDownloadReader::new(stream_reader, file_key, false);
 
@@ -179,7 +182,7 @@ impl Client {
         &self,
         file_key: &FileKey,
         url: &str,
-    ) -> Result<impl AsyncRead, Error> {
+    ) -> Result<FileDownloadReader<Pin<Box<dyn AsyncRead + Send + Sync>>>, Error> {
         let response = self
             .client
             .client
@@ -193,6 +196,8 @@ impl Client {
                 .bytes_stream()
                 .map(|result| result.map_err(std::io::Error::other)),
         );
+        let stream_reader =
+            Box::into_pin(Box::new(stream_reader) as Box<dyn AsyncRead + Send + Sync>);
 
         let reader = FileDownloadReader::new(stream_reader, file_key, true);
 
@@ -218,6 +223,7 @@ mod test {
     use super::*;
     use crate::FolderKey;
     use crate::test::*;
+    use tokio::io::AsyncReadExt;
 
     #[tokio::test]
     async fn get_attributes() {
@@ -316,19 +322,36 @@ mod test {
         };
 
         let client = Client::new();
-        let attributes = client.get_attributes(TEST_FILE_ID, true);
-        client.send_commands();
-        let attributes = attributes.await.expect("failed to get attributes");
-        let url = attributes.download_url.expect("missing download url");
-        let mut reader = client
-            .download_file(&file_key, url.as_str())
-            .await
-            .expect("failed to get download stream");
-        let mut file = Vec::with_capacity(1024 * 1024);
-        tokio::io::copy(&mut reader, &mut file)
-            .await
-            .expect("failed to copy");
+        {
+            let attributes = client.get_attributes(TEST_FILE_ID, true);
+            client.send_commands();
+            let attributes = attributes.await.expect("failed to get attributes");
+            let url = attributes.download_url.expect("missing download url");
+            let mut reader = client
+                .download_file(&file_key, url.as_str())
+                .await
+                .expect("failed to get download stream");
+            let mut file = Vec::with_capacity(1024 * 1024);
+            tokio::io::copy(&mut reader, &mut file)
+                .await
+                .expect("failed to copy");
 
-        assert!(file == TEST_FILE_BYTES);
+            assert!(file == TEST_FILE_BYTES);
+        }
+
+        {
+            let attributes = client.get_attributes(TEST_FILE_ID, true);
+            client.send_commands();
+            let attributes = attributes.await.expect("failed to get attributes");
+            let url = attributes.download_url.expect("missing download url");
+            let mut reader = client
+                .download_file(&file_key, url.as_str())
+                .await
+                .expect("failed to get download stream");
+            let mut file = Vec::new();
+            reader.read_to_end(&mut file).await.unwrap();
+
+            assert!(file == TEST_FILE_BYTES);
+        }
     }
 }

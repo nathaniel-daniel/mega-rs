@@ -140,15 +140,15 @@ impl FileValidator {
     }
 
     /// Finish feeding this data and validate the file.
-    pub fn finish(&mut self) -> Result<(), FileValidationError> {
+    pub fn finish(&self) -> Result<(), FileValidationError> {
         // Ignoring the buffer contents is not a bug.
         // The last few bytes of a file are not validated.
-        self.file_mac ^= self.chunk_mac;
-        let mut file_mac_bytes = self.file_mac.to_be_bytes();
+        let mut file_mac = self.file_mac ^ self.chunk_mac;
+        let mut file_mac_bytes = file_mac.to_be_bytes();
         aes_cbc_encrypt_u128(self.file_key.key, &mut file_mac_bytes);
-        self.file_mac = u128::from_be_bytes(file_mac_bytes);
+        file_mac = u128::from_be_bytes(file_mac_bytes);
 
-        let file_mac_bytes = self.file_mac.to_be_bytes();
+        let file_mac_bytes = file_mac.to_be_bytes();
         let file_mac_u32_0 = u32::from_be_bytes(file_mac_bytes[..4].try_into().unwrap());
         let file_mac_u32_1 = u32::from_be_bytes(file_mac_bytes[4..8].try_into().unwrap());
         let file_mac_u32_2 = u32::from_be_bytes(file_mac_bytes[8..12].try_into().unwrap());

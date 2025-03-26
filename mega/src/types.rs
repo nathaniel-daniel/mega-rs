@@ -10,6 +10,7 @@ pub use self::file_key::FileKey;
 pub use self::file_key::ParseError as FileKeyParseError;
 pub use self::folder_key::FolderKey;
 pub use self::folder_key::ParseError as FolderKeyParseError;
+pub use self::response::DecodeAttributesError;
 pub use self::response::FetchNodes as FetchNodesResponse;
 pub use self::response::GetAttributes as GetAttributesResponse;
 pub use self::response::Response;

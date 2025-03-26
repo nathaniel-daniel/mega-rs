@@ -7,8 +7,11 @@ mod types;
 pub use self::client::Client;
 #[cfg(feature = "easy")]
 pub use self::easy::Client as EasyClient;
+#[cfg(feature = "easy")]
+pub use self::easy::FileDownloadReader as EasyFileDownloadReader;
 pub use self::file_validator::FileValidator;
 pub use self::types::Command;
+pub use self::types::DecodeAttributesError;
 pub use self::types::ErrorCode;
 pub use self::types::FetchNodesResponse;
 pub use self::types::FileKey;
@@ -18,6 +21,7 @@ pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
 pub use self::types::Response;
 pub use self::types::ResponseData;
+pub use url::Url;
 
 /// The library error type
 #[derive(Debug, thiserror::Error)]
@@ -38,6 +42,10 @@ pub enum Error {
     #[error("api error")]
     ApiError(#[from] ErrorCode),
 
+    /// Failed to decode attributes
+    #[error("failed to decode attributes")]
+    DecodeAttributes(#[from] DecodeAttributesError),
+
     #[cfg(feature = "easy")]
     #[error("channel closed without response")]
     NoResponse,
@@ -49,6 +57,58 @@ pub enum Error {
     #[cfg(feature = "easy")]
     #[error("unexpected response data type")]
     UnexpectedResponseDataType,
+}
+
+/// An error that may occur while parsing a file url.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseFileUrlError {
+    #[error("invalid file key")]
+    InvalidFileKey(#[source] FileKeyParseError),
+
+    #[error("{0}")]
+    Generic(&'static str),
+}
+
+/// A parsed file url
+pub struct ParsedFileUrl<'a> {
+    /// The file id
+    pub file_id: &'a str,
+
+    /// The file key
+    pub file_key: FileKey,
+}
+
+/// Parse a file url.
+pub fn parse_file_url(url: &Url) -> Result<ParsedFileUrl<'_>, ParseFileUrlError> {
+    if url.host_str() != Some("mega.nz") {
+        return Err(ParseFileUrlError::Generic("invalid host"));
+    }
+
+    let mut path_iter = url
+        .path_segments()
+        .ok_or(ParseFileUrlError::Generic("missing path"))?;
+    if path_iter.next() != Some("file") {
+        return Err(ParseFileUrlError::Generic("missing \"file\" path segment"));
+    }
+
+    let file_id = path_iter
+        .next()
+        .ok_or(ParseFileUrlError::Generic("missing file id path segment"))?;
+
+    if path_iter.next().is_some() {
+        return Err(ParseFileUrlError::Generic(
+            "expected the path to end, but it continued",
+        ));
+    }
+
+    let file_key_raw = url
+        .fragment()
+        .ok_or(ParseFileUrlError::Generic("missing file key"))?;
+    let file_key: FileKey = file_key_raw
+        .parse()
+        .map_err(ParseFileUrlError::InvalidFileKey)?;
+
+    Ok(ParsedFileUrl { file_id, file_key })
 }
 
 #[cfg(test)]

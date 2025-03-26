@@ -1,10 +1,9 @@
 use anyhow::Context;
-use anyhow::ensure;
+use mega::Url;
 use std::path::Path;
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use url::Url;
 
 #[derive(argh::FromArgs)]
 #[argh(subcommand, name = "get", description = "download a file")]
@@ -19,24 +18,16 @@ pub struct Options {
 pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Result<()> {
     let url = Url::parse(options.input.as_str()).context("invalid url")?;
 
-    ensure!(url.host_str() == Some("mega.nz"));
-    let mut path_iter = url.path_segments().context("missing path")?;
-    ensure!(path_iter.next() == Some("file"));
+    let parsed_url = mega::parse_file_url(&url).context("failed to parse file url")?;
 
-    let file_id = path_iter.next().context("missing file id")?;
-    ensure!(path_iter.next().is_none());
-
-    let file_key_raw = url.fragment().context("missing file key")?;
-    let file_key: mega::FileKey = file_key_raw.parse()?;
-
-    let attributes_future = client.get_attributes(file_id, true);
+    let attributes_future = client.get_attributes(parsed_url.file_id, true);
     client.send_commands();
 
     let attributes = attributes_future
         .await
         .context("failed to get attributes")?;
     let decoded_attributes = attributes
-        .decode_attributes(file_key.key)
+        .decode_attributes(parsed_url.file_key.key)
         .context("failed to decode attributes")?;
     let download_url = attributes
         .download_url
@@ -59,7 +50,7 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .await
         .with_context(|| format!("failed to open \"{}\"", temp_output.display()))?;
     let mut reader = client
-        .download_file(&file_key, download_url.as_str())
+        .download_file(&parsed_url.file_key, download_url.as_str())
         .await
         .context("failed to get download stream")?;
     tokio::io::copy(&mut reader, &mut output_file).await?;

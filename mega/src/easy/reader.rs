@@ -64,14 +64,18 @@ where
         result?;
 
         let new_bytes = unfilled_buf.filled_mut();
-        this.cipher.apply_keystream(new_bytes);
         let new_bytes_len = new_bytes.len();
+        this.cipher.apply_keystream(new_bytes);
         if let Some(validator) = this.validator.as_mut() {
             if new_bytes_len == 0 {
                 validator.finish().map_err(std::io::Error::other)?;
             } else {
                 validator.feed(new_bytes);
             }
+        }
+        // Safety: This was already initialized via the unfilled_buf sub-buffer.
+        unsafe {
+            buf.assume_init(new_bytes_len);
         }
         buf.advance(new_bytes_len);
 
