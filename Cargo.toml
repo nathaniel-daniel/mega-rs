@@ -3,4 +3,5 @@ resolver = "3"
 members = [
     "mega",
     "mega-cli",
+    "mega-py",
 ]
