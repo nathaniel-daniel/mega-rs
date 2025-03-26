@@ -11,6 +11,7 @@ struct Options {
 #[argh(subcommand)]
 enum Subcommand {
     Get(self::commands::get::Options),
+    VerifyFile(self::commands::verify_file::Options),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -26,5 +27,8 @@ async fn async_main(options: Options) -> anyhow::Result<()> {
 
     match options.subcommand {
         Subcommand::Get(options) => self::commands::get::exec(&client, &options).await,
+        Subcommand::VerifyFile(options) => {
+            self::commands::verify_file::exec(&client, &options).await
+        }
     }
 }

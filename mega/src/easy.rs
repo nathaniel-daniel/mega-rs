@@ -174,8 +174,6 @@ impl Client {
 
     /// Download a file and verify its integrity.
     ///
-    /// Note that this verification is not perfect.
-    /// Corruption of the last 0-15 bytes of the file will not be detected.
     /// # Returns
     /// Returns a reader.
     pub async fn download_file(

@@ -9,6 +9,7 @@ pub use self::client::Client;
 pub use self::easy::Client as EasyClient;
 #[cfg(feature = "easy")]
 pub use self::easy::FileDownloadReader as EasyFileDownloadReader;
+pub use self::file_validator::FileValidationError;
 pub use self::file_validator::FileValidator;
 pub use self::types::Command;
 pub use self::types::DecodeAttributesError;

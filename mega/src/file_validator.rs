@@ -5,7 +5,7 @@ use cbc::cipher::KeyIvInit;
 type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
 /// An error that occurs when a file fails validation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileValidationError {
     /// The actual created mac
     pub actual_mac: [u8; 8],
@@ -49,6 +49,7 @@ pub struct FileValidator {
     chunk_mac: u128,
     buffer: [u8; 16],
     buffer_end: usize,
+    done: bool,
 }
 
 impl FileValidator {
@@ -69,6 +70,7 @@ impl FileValidator {
             chunk_mac,
             buffer: [0; 16],
             buffer_end: 0,
+            done: false,
         }
     }
 
@@ -103,7 +105,12 @@ impl FileValidator {
     /// Feed data.
     ///
     /// This should be fed decrypted bytes.
+    ///
+    /// # Panics
+    /// Panics if finish has already been called.
     pub fn feed(&mut self, mut input: &[u8]) {
+        assert!(!self.done, "cannot feed a completed file validator");
+
         if self.buffer_end != 0 {
             // Try to complete the buffer and process the block.
             let need_to_consume = self.buffer.len() - self.buffer_end;
@@ -140,9 +147,19 @@ impl FileValidator {
     }
 
     /// Finish feeding this data and validate the file.
-    pub fn finish(&self) -> Result<(), FileValidationError> {
-        // Ignoring the buffer contents is not a bug.
-        // The last few bytes of a file are not validated.
+    ///
+    /// # Panics
+    /// Panics if finish has already been called.
+    pub fn finish(&mut self) -> Result<(), FileValidationError> {
+        assert!(!self.done, "cannot finish a completed file validator");
+        self.done = true;
+
+        if self.buffer_end != 0 {
+            // Pad block with zeros.
+            self.buffer[self.buffer_end..].fill(0);
+            self.process_block(self.buffer);
+        }
+
         let mut file_mac = self.file_mac ^ self.chunk_mac;
         let mut file_mac_bytes = file_mac.to_be_bytes();
         aes_cbc_encrypt_u128(self.file_key.key, &mut file_mac_bytes);
@@ -170,6 +187,11 @@ impl FileValidator {
         }
 
         Ok(())
+    }
+
+    /// Check if finish has already been called.
+    pub fn is_finished(&self) -> bool {
+        self.done
     }
 }
 
