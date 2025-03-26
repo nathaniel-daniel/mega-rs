@@ -2,6 +2,8 @@ use crate::ErrorCode;
 use crate::FileKey;
 use crate::FolderKey;
 use crate::FolderKeyParseError;
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use cbc::cipher::BlockDecryptMut;
 use cbc::cipher::KeyInit;
 use cbc::cipher::KeyIvInit;
@@ -172,6 +174,33 @@ pub enum FetchNodesNodeKind {
     TrashBin = 4,
 }
 
+impl FetchNodesNodeKind {
+    /// Returns true if this is a file.
+    pub fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+
+    /// Returns true if this is a dir.
+    pub fn is_dir(self) -> bool {
+        matches!(self, Self::Directory)
+    }
+
+    /// Returns true if this is a root.
+    pub fn is_root(self) -> bool {
+        matches!(self, Self::Root)
+    }
+
+    /// Returns true if this is an inbox.
+    pub fn is_inbox(self) -> bool {
+        matches!(self, Self::Inbox)
+    }
+
+    /// Returns true if this is a trash bin.
+    pub fn is_trash_bin(self) -> bool {
+        matches!(self, Self::TrashBin)
+    }
+}
+
 /// A FetchNodes Node
 #[derive(Debug, serde::Serialize, serde:: Deserialize)]
 pub struct FetchNodesNode {
@@ -225,8 +254,8 @@ impl FetchNodesNode {
             .split_once(':')
             .ok_or(DecodeAttributesError::KeyMissingHeader)?;
 
-        let mut key = base64::decode_config(key, base64::URL_SAFE)?;
-        let cipher = Aes128EcbDec::new(&folder_key.0.to_ne_bytes().into());
+        let mut key = URL_SAFE_NO_PAD.decode(key)?;
+        let cipher = Aes128EcbDec::new(&folder_key.0.to_be_bytes().into());
         let key = cipher
             .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
@@ -237,7 +266,7 @@ impl FetchNodesNode {
             }
 
             // Length check is done above
-            u128::from_ne_bytes(key.try_into().unwrap())
+            u128::from_be_bytes(key.try_into().unwrap())
         } else {
             if key_len != 32 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
@@ -249,6 +278,16 @@ impl FetchNodesNode {
 
         decode_attributes(&self.encoded_attributes, key)
     }
+
+    /// Check if this is a file.
+    pub fn is_file(&self) -> bool {
+        self.kind.is_file()
+    }
+
+    /// Check if this is a dir.
+    pub fn is_dir(&self) -> bool {
+        self.kind.is_dir()
+    }
 }
 
 /// Decode the encoded attributes
@@ -256,9 +295,9 @@ fn decode_attributes(
     encoded_attributes: &str,
     key: u128,
 ) -> Result<FileAttributes, DecodeAttributesError> {
-    let mut encoded_attributes = base64::decode_config(encoded_attributes, base64::URL_SAFE)?;
+    let mut encoded_attributes = URL_SAFE_NO_PAD.decode(encoded_attributes)?;
 
-    let cipher = Aes128CbcDec::new(&key.to_ne_bytes().into(), &[0; 16].into());
+    let cipher = Aes128CbcDec::new(&key.to_be_bytes().into(), &[0; 16].into());
     let decrypted = cipher
         .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
         .map_err(DecodeAttributesError::Decrypt)?;

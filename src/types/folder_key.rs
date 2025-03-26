@@ -1,3 +1,6 @@
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
 const KEY_SIZE: usize = 16;
 const BASE64_LEN: usize = 22;
 const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
@@ -6,15 +9,15 @@ const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     /// The base64 string is the wrong size
-    #[error("invalid base64 length '{length}', expected length of '{BASE64_LEN}'")]
+    #[error("invalid base64 length \"{length}\", expected length of \"{BASE64_LEN}\"")]
     InvalidBase64Length { length: usize },
 
     /// An error occured while decoding base64
-    #[error(transparent)]
-    Base64Decode(#[from] base64::DecodeError),
+    #[error("base64 decode error")]
+    Base64Decode(#[from] base64::DecodeSliceError),
 
     /// The key is the wrong size
-    #[error("invalid key length '{length}', expected length of '{KEY_SIZE}'")]
+    #[error("invalid key length \"{length}\", expected length of \"{KEY_SIZE}\"")]
     InvalidLength { length: usize },
 }
 
@@ -34,8 +37,7 @@ impl std::str::FromStr for FolderKey {
         }
 
         let mut base64_decode_buffer = [0; BASE64_DECODE_BUFFER_LEN];
-        let decoded_len =
-            base64::decode_config_slice(input, base64::URL_SAFE, &mut base64_decode_buffer)?;
+        let decoded_len = URL_SAFE_NO_PAD.decode_slice(input, &mut base64_decode_buffer)?;
         let input = &base64_decode_buffer[..decoded_len];
 
         let length = input.len();
@@ -44,7 +46,7 @@ impl std::str::FromStr for FolderKey {
         }
 
         // Length check is done earlier
-        let key = u128::from_ne_bytes(input.try_into().unwrap());
+        let key = u128::from_be_bytes(input.try_into().unwrap());
 
         Ok(Self(key))
     }

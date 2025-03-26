@@ -1,11 +1,20 @@
+mod reader;
+mod util;
+
+use self::reader::FileDownloadReader;
+pub use self::util::ArcError;
 use crate::Command;
 use crate::Error;
 use crate::FetchNodesResponse;
+use crate::FileKey;
 use crate::GetAttributesResponse;
 use crate::ResponseData;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::Mutex;
+use tokio::io::AsyncRead;
+use tokio_stream::StreamExt;
+use tokio_util::io::StreamReader;
 
 /// A client
 #[derive(Debug, Clone)]
@@ -131,6 +140,64 @@ impl Client {
 
         Ok(response)
     }
+
+    /// Download a file without verifying its integrity.
+    ///
+    /// # Returns
+    /// Returns a reader.
+    pub async fn download_file_no_verify(
+        &self,
+        file_key: &FileKey,
+        url: &str,
+    ) -> Result<impl AsyncRead, Error> {
+        let response = self
+            .client
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let stream_reader = StreamReader::new(
+            response
+                .bytes_stream()
+                .map(|result| result.map_err(std::io::Error::other)),
+        );
+
+        let reader = FileDownloadReader::new(stream_reader, file_key, false);
+
+        Ok(reader)
+    }
+
+    /// Download a file and verify its integrity.
+    ///
+    /// Note that this verification is not perfect.
+    /// Corruption of the last 0-15 bytes of the file will not be detected.
+    /// # Returns
+    /// Returns a reader.
+    pub async fn download_file(
+        &self,
+        file_key: &FileKey,
+        url: &str,
+    ) -> Result<impl AsyncRead, Error> {
+        let response = self
+            .client
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let stream_reader = StreamReader::new(
+            response
+                .bytes_stream()
+                .map(|result| result.map_err(std::io::Error::other)),
+        );
+
+        let reader = FileDownloadReader::new(stream_reader, file_key, true);
+
+        Ok(reader)
+    }
 }
 
 impl Default for Client {
@@ -146,65 +213,11 @@ struct State {
     buffered_tx: Vec<tokio::sync::oneshot::Sender<Result<ResponseData, Error>>>,
 }
 
-/// An error that is wrapped in an Arc
-pub struct ArcError<E> {
-    /// The wrapped error
-    pub error: Arc<E>,
-}
-
-impl<E> ArcError<E> {
-    /// Make a new ArcError
-    pub fn new(error: E) -> Self {
-        Self {
-            error: Arc::new(error),
-        }
-    }
-}
-
-impl<E> std::fmt::Debug for ArcError<E>
-where
-    E: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.error.fmt(f)
-    }
-}
-
-impl<E> std::fmt::Display for ArcError<E>
-where
-    E: std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.error.fmt(f)
-    }
-}
-
-impl<E> std::error::Error for ArcError<E>
-where
-    E: std::error::Error,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.error.source()
-    }
-}
-
-impl<E> Clone for ArcError<E> {
-    fn clone(&self) -> Self {
-        Self {
-            error: self.error.clone(),
-        }
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        self.error.clone_from(&source.error)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test::*;
     use crate::FolderKey;
+    use crate::test::*;
 
     #[tokio::test]
     async fn get_attributes() {
@@ -241,19 +254,81 @@ mod test {
             .await
             .expect("failed to fetch nodes");
         assert!(response.files.len() == 3);
-        let file_attributes = response.files[0]
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "oLkVhYqA")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
 
-        let file_attributes = dbg!(&response.files[1])
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "kalwUahb")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test.txt");
 
-        let file_attributes = dbg!(&response.files[2])
+        let file_attributes = &response
+            .files
+            .iter()
+            .find(|file| file.id == "IGlBlD6K")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");
+    }
+
+    #[tokio::test]
+    async fn download_file_no_verify() {
+        let file_key = FileKey {
+            key: TEST_FILE_KEY_KEY_DECODED,
+            iv: TEST_FILE_KEY_IV_DECODED,
+            meta_mac: TEST_FILE_META_MAC_DECODED,
+        };
+
+        let client = Client::new();
+        let attributes = client.get_attributes(TEST_FILE_ID, true);
+        client.send_commands();
+        let attributes = attributes.await.expect("failed to get attributes");
+        let url = attributes.download_url.expect("missing download url");
+        let mut reader = client
+            .download_file_no_verify(&file_key, url.as_str())
+            .await
+            .expect("failed to get download stream");
+        let mut file = Vec::with_capacity(1024 * 1024);
+        tokio::io::copy(&mut reader, &mut file)
+            .await
+            .expect("failed to copy");
+
+        assert!(file == TEST_FILE_BYTES);
+    }
+
+    #[tokio::test]
+    async fn download_file_verify() {
+        let file_key = FileKey {
+            key: TEST_FILE_KEY_KEY_DECODED,
+            iv: TEST_FILE_KEY_IV_DECODED,
+            meta_mac: TEST_FILE_META_MAC_DECODED,
+        };
+
+        let client = Client::new();
+        let attributes = client.get_attributes(TEST_FILE_ID, true);
+        client.send_commands();
+        let attributes = attributes.await.expect("failed to get attributes");
+        let url = attributes.download_url.expect("missing download url");
+        let mut reader = client
+            .download_file(&file_key, url.as_str())
+            .await
+            .expect("failed to get download stream");
+        let mut file = Vec::with_capacity(1024 * 1024);
+        tokio::io::copy(&mut reader, &mut file)
+            .await
+            .expect("failed to copy");
+
+        assert!(file == TEST_FILE_BYTES);
     }
 }

@@ -1,11 +1,13 @@
 mod client;
 #[cfg(feature = "easy")]
 mod easy;
+mod file_validator;
 mod types;
 
 pub use self::client::Client;
 #[cfg(feature = "easy")]
 pub use self::easy::Client as EasyClient;
+pub use self::file_validator::FileValidator;
 pub use self::types::Command;
 pub use self::types::ErrorCode;
 pub use self::types::FetchNodesResponse;
@@ -29,7 +31,7 @@ pub enum Error {
     Url(#[from] url::ParseError),
 
     /// The returned number of responses did not match what was expected
-    #[error("expected '{expected}' responses, but got '{actual}'")]
+    #[error("expected \"{expected}\" responses, but got \"{actual}\"")]
     ResponseLengthMismatch { expected: usize, actual: usize },
 
     /// There was an api error
@@ -66,18 +68,18 @@ mod test {
     pub const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_ID: &str = "MWsm3aBL";
 
-    pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_ne_bytes([
+    pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_be_bytes([
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
     ]);
     pub const TEST_FILE_KEY_IV_DECODED: u128 =
-        u128::from_ne_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
+        u128::from_be_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
     pub const TEST_FILE_META_MAC_DECODED: u64 =
-        u64::from_ne_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
-    pub const TEST_FOLDER_KEY_DECODED: u128 = u128::from_ne_bytes([
+        u64::from_be_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
+    pub const TEST_FOLDER_KEY_DECODED: u128 = u128::from_be_bytes([
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ]);
 
-    const TEST_FILE_BYTES: &[u8] = include_bytes!("../test_data/Doxygen_docs.zip");
+    pub const TEST_FILE_BYTES: &[u8] = include_bytes!("../test_data/Doxygen_docs.zip");
 
     #[test]
     fn parse_file_key() {
@@ -121,28 +123,30 @@ mod test {
             .download_url
             .as_ref()
             .expect("missing download url");
-        {
-            let response = client
-                .client
-                .get(download_url.as_str())
-                .send()
-                .await
-                .expect("failed to send")
-                .error_for_status()
-                .expect("invalid status");
-            let mut bytes = response
-                .bytes()
-                .await
-                .expect("failed to get bytes")
-                .to_vec();
 
-            let mut cipher = Aes128Ctr128BE::new(
-                &file_key.key.to_ne_bytes().into(),
-                &file_key.iv.to_ne_bytes().into(),
-            );
-            cipher.apply_keystream(&mut bytes);
+        let mut response = client
+            .client
+            .get(download_url.as_str())
+            .send()
+            .await
+            .expect("failed to send")
+            .error_for_status()
+            .expect("invalid status");
+        let mut cipher = Aes128Ctr128BE::new(
+            &file_key.key.to_be_bytes().into(),
+            &file_key.iv.to_be_bytes().into(),
+        );
 
-            assert!(bytes == TEST_FILE_BYTES);
+        let mut output = Vec::new();
+        let mut validator = FileValidator::new(file_key.clone());
+        while let Some(chunk) = response.chunk().await.expect("failed to get chunk") {
+            let old_len = output.len();
+            output.extend(&chunk);
+            cipher.apply_keystream(&mut output[old_len..]);
         }
+        assert!(output == TEST_FILE_BYTES);
+
+        validator.feed(&output);
+        validator.finish().expect("validation failed");
     }
 }

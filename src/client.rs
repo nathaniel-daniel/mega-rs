@@ -3,10 +3,9 @@ use crate::Error;
 use crate::ErrorCode;
 use crate::Response;
 use crate::ResponseData;
-use rand::Rng;
+use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
@@ -25,17 +24,27 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            sequence_id: Arc::new(AtomicU64::new(rand::thread_rng().gen())),
+            sequence_id: Arc::new(AtomicU64::new(rand::random())),
         }
     }
 
     /// Execute a series of commands.
+    ///
+    /// # Retries
+    /// If the client receives an EAGAIN,
+    /// it will attempt to retry the request.
+    /// After a number of tries with the same EAGAIN error,
+    /// the client will return EAGAIN to the caller.
     pub async fn execute_commands(
         &self,
         commands: &[Command],
         node: Option<&str>,
     ) -> Result<Vec<Response<ResponseData>>, Error> {
-        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % 100_000;
+        const MAX_RETRIES: usize = 3;
+        const BASE_DELAY: u64 = 250;
+        const MAX_SEQUENCE_ID: u64 = 100_000;
+
+        let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % MAX_SEQUENCE_ID;
         let mut url = Url::parse_with_params(
             "https://g.api.mega.co.nz/cs",
             &[("id", itoa::Buffer::new().format(id))],
@@ -60,8 +69,8 @@ impl Client {
                 .await?;
             let response = response.into_result();
 
-            if retries < 3 && matches!(response, Err(ErrorCode::EAGAIN)) {
-                let millis = 250 * (1 << retries);
+            if retries < MAX_RETRIES && matches!(response, Err(ErrorCode::EAGAIN)) {
+                let millis = BASE_DELAY * (1 << retries);
                 tokio::time::sleep(Duration::from_millis(millis)).await;
                 retries += 1;
                 continue;
@@ -170,17 +179,29 @@ mod test {
             _ => panic!("unexpected response"),
         };
         assert!(response.files.len() == 3);
-        let file_attributes = response.files[0]
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "oLkVhYqA")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
 
-        let file_attributes = dbg!(&response.files[1])
+        let file_attributes = response
+            .files
+            .iter()
+            .find(|file| file.id == "kalwUahb")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test.txt");
 
-        let file_attributes = dbg!(&response.files[2])
+        let file_attributes = &response
+            .files
+            .iter()
+            .find(|file| file.id == "IGlBlD6K")
+            .expect("failed to locate file")
             .decode_attributes(&folder_key)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");

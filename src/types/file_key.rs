@@ -1,3 +1,6 @@
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
 const KEY_SIZE: usize = 16;
 const BASE64_LEN: usize = 43;
 const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
@@ -6,15 +9,15 @@ const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     /// The base64 string is the wrong size
-    #[error("invalid base64 length '{length}', expected length '{BASE64_LEN}'")]
+    #[error("invalid base64 length \"{length}\", expected length \"{BASE64_LEN}\"")]
     InvalidBase64Length { length: usize },
 
     /// An error occured while decoding base64
-    #[error(transparent)]
-    Base64Decode(#[from] base64::DecodeError),
+    #[error("base64 decode error")]
+    Base64Decode(#[from] base64::DecodeSliceError),
 
     /// The key is the wrong size
-    #[error("invalid key length '{length}', expected length '{KEY_SIZE}'")]
+    #[error("invalid key length \"{length}\", expected length \"{KEY_SIZE}\"")]
     InvalidLength { length: usize },
 }
 
@@ -37,14 +40,14 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    /// Make a FileKey from encoded bytes
+    /// Make a FileKey from encoded bytes.
     pub(crate) fn from_encoded_bytes(input: &[u8; KEY_SIZE * 2]) -> Self {
         let key = {
             let (n1, n2) = input.split_at(KEY_SIZE);
 
             // Lengths are verified via split above and the function array size limit
-            let n1 = u128::from_ne_bytes(n1.try_into().unwrap());
-            let n2 = u128::from_ne_bytes(n2.try_into().unwrap());
+            let n1 = u128::from_be_bytes(n1.try_into().unwrap());
+            let n2 = u128::from_be_bytes(n2.try_into().unwrap());
 
             n1 ^ n2
         };
@@ -52,10 +55,10 @@ impl FileKey {
         let (iv, meta_mac) = input[KEY_SIZE..].split_at(std::mem::size_of::<u64>());
 
         // Length is verified by split above.
-        let iv = u128::from(u64::from_ne_bytes(iv.try_into().unwrap()));
+        let iv = u128::from(u64::from_be_bytes(iv.try_into().unwrap())) << 64;
 
-        // Length is verified by split and length of input
-        let meta_mac = u64::from_ne_bytes(meta_mac.try_into().unwrap());
+        // Length is verified by split and length of input.
+        let meta_mac = u64::from_be_bytes(meta_mac.try_into().unwrap());
 
         Self { key, iv, meta_mac }
     }
@@ -71,8 +74,7 @@ impl std::str::FromStr for FileKey {
         }
 
         let mut base64_decode_buffer = [0; BASE64_DECODE_BUFFER_LEN];
-        let decoded_len =
-            base64::decode_config_slice(input, base64::URL_SAFE, &mut base64_decode_buffer)?;
+        let decoded_len = URL_SAFE_NO_PAD.decode_slice(input, &mut base64_decode_buffer)?;
         let input = &base64_decode_buffer[..decoded_len];
         let length = input.len();
         if length != KEY_SIZE * 2 {
