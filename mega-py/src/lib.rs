@@ -117,6 +117,7 @@ pub struct FileDownload {
 
 #[pymethods]
 impl FileDownload {
+    #[pyo3(signature = (size=Some(-1), /), text_signature = "(size=-1, /)")]
     fn read<'p>(&mut self, size: Option<isize>, py: Python<'p>) -> PyResult<Bound<'p, PyBytes>> {
         let size = match size {
             Some(size) if size > 0 => Some(
