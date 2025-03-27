@@ -44,12 +44,11 @@ impl Client {
         let parsed_url =
             mega::parse_file_url(&url).map_err(|error| PyValueError::new_err(error.to_string()))?;
 
-        let (attributes, decoded_attributes) = tokio_rt
+        let (_attributes, decoded_attributes) = tokio_rt
             .block_on(async {
-                let attributes_future = self.client.get_attributes(parsed_url.file_id, false);
-                self.client.send_commands();
-
-                let attributes = attributes_future.await?;
+                let mut builder = mega::EasyGetAttributesBuilder::new();
+                builder.public_file_id(parsed_url.file_id);
+                let attributes = self.client.get_attributes(builder).await?;
                 let decoded_attributes = attributes.decode_attributes(parsed_url.file_key.key)?;
 
                 Result::<_, mega::Error>::Ok((attributes, decoded_attributes))
@@ -68,10 +67,12 @@ impl Client {
         let tokio_rt = get_tokio_rt()?;
 
         let reader = tokio_rt.block_on(async {
-            let attributes_future = self.client.get_attributes(&file.id, true);
-            self.client.send_commands();
+            let mut builder = mega::EasyGetAttributesBuilder::new();
+            builder.include_download_url(true).public_file_id(&file.id);
 
-            let attributes = attributes_future
+            let attributes = self
+                .client
+                .get_attributes(builder)
                 .await
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
             let download_url = attributes
@@ -97,8 +98,6 @@ pub struct File {
     pub id: String,
     #[pyo3(get)]
     pub name: String,
-    #[pyo3(get, name = "type")]
-    pub kind: String,
 
     key: FileKey,
 }
@@ -108,9 +107,8 @@ impl File {
     pub fn __repr__(&self) -> String {
         let id = &self.id;
         let name = &self.name;
-        let kind = &self.kind;
 
-        format!("File(id={id:?}, name={name:?}, type={kind:?})")
+        format!("File(id={id:?}, name={name:?})")
     }
 }
 
