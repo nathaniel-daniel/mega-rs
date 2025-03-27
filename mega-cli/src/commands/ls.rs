@@ -1,4 +1,5 @@
 use anyhow::Context;
+use anyhow::ensure;
 use mega::Url;
 
 #[derive(argh::FromArgs)]
@@ -14,10 +15,17 @@ pub struct Options {
 pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Result<()> {
     let url = Url::parse(options.input.as_str()).context("invalid url")?;
 
-    let parsed_url = mega::parse_folder_url(&url).context("failed to parse folder url")?;
+    let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("failed to parse folder url")?;
+    let parsed_url = parsed_url
+        .as_folder_url()
+        .context("url must be a folder url")?;
+    ensure!(
+        parsed_url.child_data.is_none(),
+        "folder urls with child data are currently unsupported"
+    );
 
     let response = client
-        .fetch_nodes(Some(parsed_url.folder_id), options.recursive)
+        .fetch_nodes(Some(&parsed_url.folder_id), options.recursive)
         .await
         .context("failed to fetch")?;
 

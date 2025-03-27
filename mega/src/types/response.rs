@@ -1,5 +1,6 @@
 use crate::ErrorCode;
 use crate::FileKey;
+use crate::FileOrFolderKey;
 use crate::FolderKey;
 use crate::FolderKeyParseError;
 use base64::Engine;
@@ -198,32 +199,6 @@ impl FetchNodesNodeKind {
     /// Returns true if this is a trash bin.
     pub fn is_trash_bin(self) -> bool {
         matches!(self, Self::TrashBin)
-    }
-}
-
-/// Either a file or folder key
-#[derive(Debug, Clone)]
-pub enum FileOrFolderKey {
-    File(FileKey),
-    Folder(FolderKey),
-}
-
-impl FileOrFolderKey {
-    /// Get the key.
-    pub fn key(&self) -> u128 {
-        match self {
-            Self::File(file_key) => file_key.key,
-            Self::Folder(folder_key) => folder_key.0,
-        }
-    }
-}
-
-impl std::fmt::Display for FileOrFolderKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::File(file_key) => file_key.fmt(f),
-            Self::Folder(folder_key) => folder_key.fmt(f),
-        }
     }
 }
 

@@ -37,28 +37,87 @@ impl Client {
     }
 
     /// Get a file by url.
-    pub fn get_file(&self, url: &str) -> PyResult<File> {
+    #[pyo3(signature=(url=None, node_id=None, key=None))]
+    pub fn get_file(
+        &self,
+        url: Option<&str>,
+        mut node_id: Option<String>,
+        key: Option<&str>,
+    ) -> PyResult<File> {
         let tokio_rt = get_tokio_rt()?;
 
-        let url = Url::parse(url).map_err(|error| PyValueError::new_err(error.to_string()))?;
-        let parsed_url =
-            mega::parse_file_url(&url).map_err(|error| PyValueError::new_err(error.to_string()))?;
+        if url.is_some() && node_id.is_some() {
+            return Err(PyValueError::new_err(
+                "url and node_id are mutually exclusive",
+            ));
+        }
+
+        let mut public_file_id = None;
+        let mut file_key = None;
+        let mut reference_node_id = None;
+        if let Some(url) = url {
+            let url = Url::parse(url).map_err(|error| PyValueError::new_err(error.to_string()))?;
+            let parsed_url = mega::ParsedMegaUrl::try_from(&url)
+                .map_err(|error| PyValueError::new_err(error.to_string()))?;
+            match parsed_url {
+                mega::ParsedMegaUrl::File(file_url) => {
+                    public_file_id = Some(file_url.file_id.to_string());
+                    file_key = Some(file_url.file_key);
+                }
+                mega::ParsedMegaUrl::Folder(folder_url) => {
+                    let child_data = folder_url.child_data.ok_or_else(|| {
+                        PyValueError::new_err(
+                            "folder urls without child data are currently unsupported",
+                        )
+                    })?;
+                    if !child_data.is_file {
+                        return Err(PyValueError::new_err(
+                            "folder urls with folder child data are currently unsupported",
+                        ));
+                    }
+
+                    if node_id.is_none() {
+                        node_id = Some(child_data.node_id.clone());
+                    }
+
+                    reference_node_id = Some(folder_url.folder_id);
+                }
+            }
+        }
+
+        if let Some(key) = key {
+            let parsed = key
+                .parse::<mega::FileKey>()
+                .map_err(|err| PyValueError::new_err(err.to_string()))?;
+            file_key = Some(parsed);
+        }
+
+        let file_key = file_key.ok_or_else(|| PyValueError::new_err("Missing key"))?;
 
         let (_attributes, decoded_attributes) = tokio_rt
             .block_on(async {
                 let mut builder = mega::EasyGetAttributesBuilder::new();
-                builder.public_file_id(parsed_url.file_id);
+                if let Some(public_file_id) = public_file_id.as_ref() {
+                    builder.public_file_id(public_file_id);
+                }
+                if let Some(node_id) = node_id.as_ref() {
+                    builder.node_id(node_id);
+                }
+                if let Some(reference_node_id) = reference_node_id {
+                    builder.reference_node_id(reference_node_id);
+                }
                 let attributes = self.client.get_attributes(builder).await?;
-                let decoded_attributes = attributes.decode_attributes(parsed_url.file_key.key)?;
+                let decoded_attributes = attributes.decode_attributes(file_key.key)?;
 
                 Result::<_, mega::Error>::Ok((attributes, decoded_attributes))
             })
             .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
         Ok(File {
-            id: parsed_url.file_id.to_string(),
+            public_id: public_file_id,
+            node_id: node_id.map(|value| value.to_string()),
             name: decoded_attributes.name,
-            key: parsed_url.file_key,
+            key: file_key,
         })
     }
 
@@ -68,7 +127,13 @@ impl Client {
 
         let reader = tokio_rt.block_on(async {
             let mut builder = mega::EasyGetAttributesBuilder::new();
-            builder.include_download_url(true).public_file_id(&file.id);
+            builder.include_download_url(true);
+            if let Some(public_id) = file.public_id.as_ref() {
+                builder.public_file_id(public_id);
+            }
+            if let Some(node_id) = file.node_id.as_ref() {
+                builder.node_id(node_id);
+            }
 
             let attributes = self
                 .client
@@ -90,12 +155,64 @@ impl Client {
 
         Ok(FileDownload { reader })
     }
+
+    /// List a folder.
+    #[pyo3(signature = (url, recursive = false))]
+    pub fn list_folder(&self, url: &str, recursive: bool) -> PyResult<Vec<FolderEntry>> {
+        let url = Url::parse(url).map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let tokio_rt = get_tokio_rt()?;
+
+        let parsed_url = mega::ParsedMegaUrl::try_from(&url)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let parsed_url = parsed_url
+            .as_folder_url()
+            .ok_or_else(|| PyValueError::new_err("url must be a folder url"))?;
+
+        if parsed_url.child_data.is_some() {
+            return Err(PyValueError::new_err(
+                "folder urls with child data are currently unsupported",
+            ));
+        }
+
+        let response = tokio_rt
+            .block_on(async {
+                self.client
+                    .fetch_nodes(Some(&parsed_url.folder_id), recursive)
+                    .await
+            })
+            .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+
+        let mut items = Vec::new();
+        for item in response.files.into_iter() {
+            let key = item
+                .decrypt_key(&parsed_url.folder_key)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            let attributes = item
+                .decode_attributes(&parsed_url.folder_key)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+
+            items.push(FolderEntry {
+                id: item.id,
+                name: attributes.name,
+                key,
+                kind: match item.kind {
+                    mega::FetchNodesNodeKind::File => "file".into(),
+                    mega::FetchNodesNodeKind::Directory => "folder".into(),
+                    _ => "unknown".to_string(),
+                },
+            });
+        }
+
+        Ok(items)
+    }
 }
 
 #[pyclass]
 pub struct File {
     #[pyo3(get)]
-    pub id: String,
+    pub public_id: Option<String>,
+    #[pyo3(get)]
+    pub node_id: Option<String>,
     #[pyo3(get)]
     pub name: String,
 
@@ -105,10 +222,17 @@ pub struct File {
 #[pymethods]
 impl File {
     pub fn __repr__(&self) -> String {
-        let id = &self.id;
+        let public_id = &self.public_id;
+        let node_id = &self.node_id;
         let name = &self.name;
+        let key = &self.key;
 
-        format!("File(id={id:?}, name={name:?})")
+        format!("File(public_id={public_id:?}, node_id={node_id:?}, name={name:?}, key=\"{key}\")")
+    }
+
+    #[getter]
+    pub fn key(&self) -> String {
+        self.key.to_string()
     }
 }
 
@@ -150,6 +274,36 @@ impl FileDownload {
         })?;
 
         Ok(PyBytes::new(py, &buffer))
+    }
+}
+
+/// A folder listing item
+#[pyclass]
+pub struct FolderEntry {
+    #[pyo3(get)]
+    pub id: String,
+    #[pyo3(get)]
+    pub name: String,
+    #[pyo3(get, name = "type")]
+    pub kind: String,
+
+    key: mega::FileOrFolderKey,
+}
+
+#[pymethods]
+impl FolderEntry {
+    #[getter]
+    pub fn key(&self) -> String {
+        self.key.to_string()
+    }
+
+    pub fn __repr__(&self) -> String {
+        let id = &self.id;
+        let name = &self.name;
+        let key = &self.key;
+        let kind = &self.kind;
+
+        format!("FolderEntry(id={id:?}, name={name:?}, key=\"{key}\", type=\"{kind}\")")
     }
 }
 

@@ -1,4 +1,6 @@
 use anyhow::Context;
+use anyhow::bail;
+use anyhow::ensure;
 use mega::Url;
 use std::path::Path;
 use std::path::PathBuf;
@@ -29,10 +31,26 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
     let mut file_key = None;
     if options.input.starts_with("https://mega.nz") {
         let url = Url::parse(options.input.as_str()).context("invalid url")?;
-        let parsed_url = mega::parse_file_url(&url).context("failed to parse file url")?;
+        let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("failed to parse mega url")?;
 
-        public_file_id = Some(parsed_url.file_id.to_string());
-        file_key = Some(parsed_url.file_key.clone());
+        match parsed_url {
+            mega::ParsedMegaUrl::File(file_url) => {
+                public_file_id = Some(file_url.file_id.to_string());
+                file_key = Some(file_url.file_key.clone());
+            }
+            mega::ParsedMegaUrl::Folder(folder_url) => {
+                let child_data = folder_url
+                    .child_data
+                    .as_ref()
+                    .context("folder urls without child data are currently unsupported")?;
+                ensure!(
+                    child_data.is_file,
+                    "folder child data is currently unsupported"
+                );
+
+                bail!("folder urls are currently unsupported");
+            }
+        }
     } else {
         node_id = Some(options.input.as_str());
     };
