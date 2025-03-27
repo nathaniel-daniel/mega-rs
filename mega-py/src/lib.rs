@@ -103,7 +103,7 @@ impl Client {
                 if let Some(node_id) = node_id.as_ref() {
                     builder.node_id(node_id);
                 }
-                if let Some(reference_node_id) = reference_node_id {
+                if let Some(reference_node_id) = reference_node_id.clone() {
                     builder.reference_node_id(reference_node_id);
                 }
                 let attributes = self.client.get_attributes(builder).await?;
@@ -118,6 +118,7 @@ impl Client {
             node_id: node_id.map(|value| value.to_string()),
             name: decoded_attributes.name,
             key: file_key,
+            reference_node_id,
         })
     }
 
@@ -133,6 +134,9 @@ impl Client {
             }
             if let Some(node_id) = file.node_id.as_ref() {
                 builder.node_id(node_id);
+            }
+            if let Some(reference_node_id) = file.reference_node_id.clone() {
+                builder.reference_node_id(reference_node_id);
             }
 
             let attributes = self
@@ -216,6 +220,7 @@ pub struct File {
     #[pyo3(get)]
     pub name: String,
 
+    reference_node_id: Option<String>,
     key: FileKey,
 }
 
@@ -225,9 +230,10 @@ impl File {
         let public_id = &self.public_id;
         let node_id = &self.node_id;
         let name = &self.name;
+        let reference_node_id = &self.reference_node_id;
         let key = &self.key;
 
-        format!("File(public_id={public_id:?}, node_id={node_id:?}, name={name:?}, key=\"{key}\")")
+        format!("File(public_id={public_id:?}, node_id={node_id:?}, name={name:?}, reference_node_id={reference_node_id:?}, key=\"{key}\")")
     }
 
     #[getter]
