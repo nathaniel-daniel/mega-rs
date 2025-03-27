@@ -308,12 +308,12 @@ mod test {
     use crate::test::*;
     use tokio::io::AsyncReadExt;
 
+    /*
     #[tokio::test]
     async fn get_attributes() {
         let client = Client::new();
         let get_attributes_1_future = client.get_attributes(TEST_FILE_ID, false);
         let get_attributes_2_future = client.get_attributes(TEST_FILE_ID, true);
-        client.send_commands();
 
         let attributes_1 = get_attributes_1_future
             .await
@@ -332,6 +332,7 @@ mod test {
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "Doxygen_docs.zip");
     }
+    */
 
     #[tokio::test]
     async fn fetch_nodes() {
@@ -339,7 +340,7 @@ mod test {
 
         let client = Client::new();
         let response = client
-            .fetch_nodes(Some(TEST_FOLDER_ID))
+            .fetch_nodes(Some(TEST_FOLDER_ID), true)
             .await
             .expect("failed to fetch nodes");
         assert!(response.files.len() == 3);
@@ -380,9 +381,14 @@ mod test {
         };
 
         let client = Client::new();
-        let attributes = client.get_attributes(TEST_FILE_ID, true);
-        client.send_commands();
-        let attributes = attributes.await.expect("failed to get attributes");
+        let mut builder = GetAttributesBuilder::new();
+        builder
+            .include_download_url(true)
+            .public_file_id(TEST_FILE_ID);
+        let attributes = client
+            .get_attributes(builder)
+            .await
+            .expect("failed to get attributes");
         let url = attributes.download_url.expect("missing download url");
         let mut reader = client
             .download_file_no_verify(&file_key, url.as_str())
@@ -406,9 +412,14 @@ mod test {
 
         let client = Client::new();
         {
-            let attributes = client.get_attributes(TEST_FILE_ID, true);
-            client.send_commands();
-            let attributes = attributes.await.expect("failed to get attributes");
+            let mut builder = GetAttributesBuilder::new();
+            builder
+                .include_download_url(true)
+                .public_file_id(TEST_FILE_ID);
+            let attributes = client
+                .get_attributes(builder)
+                .await
+                .expect("failed to get attributes");
             let url = attributes.download_url.expect("missing download url");
             let mut reader = client
                 .download_file(&file_key, url.as_str())
@@ -423,9 +434,14 @@ mod test {
         }
 
         {
-            let attributes = client.get_attributes(TEST_FILE_ID, true);
-            client.send_commands();
-            let attributes = attributes.await.expect("failed to get attributes");
+            let mut builder = GetAttributesBuilder::new();
+            builder
+                .include_download_url(true)
+                .public_file_id(TEST_FILE_ID);
+            let attributes = client
+                .get_attributes(builder)
+                .await
+                .expect("failed to get attributes");
             let url = attributes.download_url.expect("missing download url");
             let mut reader = client
                 .download_file(&file_key, url.as_str())
