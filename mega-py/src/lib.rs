@@ -44,7 +44,7 @@ impl Client {
         let parsed_url =
             mega::parse_file_url(&url).map_err(|error| PyValueError::new_err(error.to_string()))?;
 
-        let decoded_attributes = tokio_rt
+        let (attributes, decoded_attributes) = tokio_rt
             .block_on(async {
                 let attributes_future = self.client.get_attributes(parsed_url.file_id, false);
                 self.client.send_commands();
@@ -52,7 +52,7 @@ impl Client {
                 let attributes = attributes_future.await?;
                 let decoded_attributes = attributes.decode_attributes(parsed_url.file_key.key)?;
 
-                Result::<_, mega::Error>::Ok(decoded_attributes)
+                Result::<_, mega::Error>::Ok((attributes, decoded_attributes))
             })
             .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
@@ -97,6 +97,9 @@ pub struct File {
     pub id: String,
     #[pyo3(get)]
     pub name: String,
+    #[pyo3(get, name = "type")]
+    pub kind: String,
+
     key: FileKey,
 }
 
@@ -105,8 +108,9 @@ impl File {
     pub fn __repr__(&self) -> String {
         let id = &self.id;
         let name = &self.name;
+        let kind = &self.kind;
 
-        format!("File(id={id}, name={name})")
+        format!("File(id={id:?}, name={name:?}, type={kind:?})")
     }
 }
 

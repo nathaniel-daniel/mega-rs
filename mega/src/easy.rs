@@ -11,8 +11,8 @@ use crate::GetAttributesResponse;
 use crate::ResponseData;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::Mutex;
+// use std::sync::Arc;
+// use std::sync::Mutex;
 use tokio::io::AsyncRead;
 use tokio_stream::StreamExt;
 use tokio_util::io::StreamReader;
@@ -22,9 +22,8 @@ use tokio_util::io::StreamReader;
 pub struct Client {
     /// The low-level api client
     pub client: crate::Client,
-
-    /// Client state
-    state: Arc<Mutex<State>>,
+    // /// Client state
+    // state: Arc<Mutex<State>>,
 }
 
 impl Client {
@@ -32,13 +31,16 @@ impl Client {
     pub fn new() -> Self {
         Self {
             client: crate::Client::new(),
+            /*
             state: Arc::new(Mutex::new(State {
                 buffered_commands: Vec::with_capacity(4),
                 buffered_tx: Vec::with_capacity(4),
             })),
+            */
         }
     }
 
+    /*
     /// Queue a command to be sent
     fn queue_command(
         &self,
@@ -94,21 +96,31 @@ impl Client {
             };
         });
     }
+    */
 
     /// Get attributes for a file.
     pub fn get_attributes(
         &self,
-        file_id: &str,
-        include_download_url: bool,
+        builder: GetAttributesBuilder,
     ) -> impl Future<Output = Result<GetAttributesResponse, Error>> {
-        let rx = self.queue_command(Command::GetAttributes {
-            file_id: file_id.to_string(),
-            include_download_url: if include_download_url { Some(1) } else { None },
-        });
+        let command = Command::GetAttributes {
+            public_file_id: builder.public_file_id,
+            node_id: builder.node_id,
+            include_download_url: if builder.include_download_url {
+                Some(1)
+            } else {
+                None
+            },
+        };
 
-        async {
-            let response = rx.await.map_err(|_e| Error::NoResponse)??;
-            let response = match response {
+        async move {
+            let commands = [command];
+
+            let response = self
+                .client
+                .execute_commands(&commands, builder.reference_node_id.as_deref());
+
+            let response = match response.await?.swap_remove(0).into_result()? {
                 ResponseData::GetAttributes(response) => response,
                 _ => {
                     return Err(Error::UnexpectedResponseDataType);
@@ -122,8 +134,15 @@ impl Client {
     /// Get the nodes for a folder node.
     ///
     /// This bypasses the command buffering system as it is more efficient for Mega's servers to process this alone.
-    pub async fn fetch_nodes(&self, node_id: Option<&str>) -> Result<FetchNodesResponse, Error> {
-        let command = Command::FetchNodes { c: 1, r: 1 };
+    pub async fn fetch_nodes(
+        &self,
+        node_id: Option<&str>,
+        recursive: bool,
+    ) -> Result<FetchNodesResponse, Error> {
+        let command = Command::FetchNodes {
+            c: 1,
+            recursive: u8::from(recursive),
+        };
         let mut response = self
             .client
             .execute_commands(std::slice::from_ref(&command), node_id)
@@ -209,11 +228,77 @@ impl Default for Client {
     }
 }
 
+/*
 /// The client state
 #[derive(Debug)]
 struct State {
     buffered_commands: Vec<Command>,
     buffered_tx: Vec<tokio::sync::oneshot::Sender<Result<ResponseData, Error>>>,
+}
+*/
+
+/// A builder for a get_attributes call.
+#[derive(Debug)]
+pub struct GetAttributesBuilder {
+    /// The public id of the node.
+    ///
+    /// Mutually exclusive with `node_id`.
+    pub public_file_id: Option<String>,
+    /// The node id.
+    ///
+    /// Mutually exclusive with `public_file_id`.
+    pub node_id: Option<String>,
+    /// Whether this should include the download url
+    pub include_download_url: bool,
+
+    /// The reference node id.
+    pub reference_node_id: Option<String>,
+}
+
+impl GetAttributesBuilder {
+    /// Make a new builder.
+    pub fn new() -> Self {
+        Self {
+            public_file_id: None,
+            node_id: None,
+            include_download_url: false,
+            reference_node_id: None,
+        }
+    }
+
+    /// Set the public file id.
+    ///
+    /// Mutually exclusive with `node_id`.
+    pub fn public_file_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.public_file_id = Some(value.into());
+        self
+    }
+
+    /// Set the node id.
+    ///
+    /// Mutually exclusive with `public_file_id`.
+    pub fn node_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.node_id = Some(value.into());
+        self
+    }
+
+    /// Set the include_download_url field.
+    pub fn include_download_url(&mut self, value: bool) -> &mut Self {
+        self.include_download_url = value;
+        self
+    }
+
+    /// Set the reference node id.
+    pub fn reference_node_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.reference_node_id = Some(value.into());
+        self
+    }
+}
+
+impl Default for GetAttributesBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

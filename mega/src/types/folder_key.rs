@@ -51,3 +51,29 @@ impl std::str::FromStr for FolderKey {
         Ok(Self(key))
     }
 }
+
+impl std::fmt::Display for FolderKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut buffer = [0; BASE64_LEN];
+        let encoded_len = URL_SAFE_NO_PAD
+            .encode_slice(self.0.to_be_bytes(), &mut buffer)
+            .expect("output buffer should never be too small");
+        let value = std::str::from_utf8(&buffer[..encoded_len]).expect("output should be utf8");
+
+        f.write_str(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::test::*;
+
+    #[test]
+    fn round() {
+        let folder_key = FolderKey(TEST_FOLDER_KEY_DECODED);
+        let folder_key_string = folder_key.to_string();
+        let new_folder_key: FolderKey = folder_key_string.parse().expect("failed to parse");
+        assert!(folder_key.0 == new_folder_key.0);
+    }
+}

@@ -9,6 +9,8 @@ pub use self::client::Client;
 pub use self::easy::Client as EasyClient;
 #[cfg(feature = "easy")]
 pub use self::easy::FileDownloadReader as EasyFileDownloadReader;
+#[cfg(feature = "easy")]
+pub use self::easy::GetAttributesBuilder as EasyGetAttributesBuilder;
 pub use self::file_validator::FileValidationError;
 pub use self::file_validator::FileValidator;
 pub use self::types::Command;
@@ -28,11 +30,11 @@ pub use url::Url;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// A reqwest Error
-    #[error(transparent)]
+    #[error("http error")]
     Reqwest(#[from] reqwest::Error),
 
     /// A Url Error
-    #[error(transparent)]
+    #[error("url error")]
     Url(#[from] url::ParseError),
 
     /// The returned number of responses did not match what was expected
@@ -112,6 +114,68 @@ pub fn parse_file_url(url: &Url) -> Result<ParsedFileUrl<'_>, ParseFileUrlError>
     Ok(ParsedFileUrl { file_id, file_key })
 }
 
+/// An error that may occur while parsing a folder url.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseFolderUrlError {
+    #[error("invalid folder key")]
+    InvalidFolderKey(#[source] FolderKeyParseError),
+
+    #[error("{0}")]
+    Generic(&'static str),
+}
+
+/// A parsed folder url
+#[derive(Debug)]
+pub struct ParsedFolderUrl<'a> {
+    /// The folder id
+    pub folder_id: &'a str,
+
+    ///The folder key
+    pub folder_key: FolderKey,
+}
+
+/// Parse a folder url.
+pub fn parse_folder_url(url: &Url) -> Result<ParsedFolderUrl<'_>, ParseFolderUrlError> {
+    if url.host_str() != Some("mega.nz") {
+        return Err(ParseFolderUrlError::Generic("invalid host"));
+    }
+
+    let mut path_iter = url
+        .path_segments()
+        .ok_or(ParseFolderUrlError::Generic("missing path"))?;
+    if path_iter.next() != Some("folder") {
+        return Err(ParseFolderUrlError::Generic(
+            "missing \"folder\" path segment",
+        ));
+    }
+
+    let folder_id = path_iter.next().ok_or(ParseFolderUrlError::Generic(
+        "missing folder id path segment",
+    ))?;
+
+    if path_iter.next().is_some() {
+        return Err(ParseFolderUrlError::Generic(
+            "expected the path to end, but it continued",
+        ));
+    }
+
+    let folder_key_raw = url
+        .fragment()
+        .ok_or(ParseFolderUrlError::Generic("missing folder key"))?;
+    let (folder_key_raw, _rest) = folder_key_raw
+        .split_once('/')
+        .unwrap_or((folder_key_raw, ""));
+
+    let folder_key: FolderKey = folder_key_raw
+        .parse()
+        .map_err(ParseFolderUrlError::InvalidFolderKey)?;
+
+    Ok(ParsedFolderUrl {
+        folder_id,
+        folder_key,
+    })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -120,14 +184,17 @@ mod test {
 
     type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
-    // const TEST_FILE: &str =
-    //    "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
+    const TEST_FILE: &str =
+        "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     pub const TEST_FILE_KEY: &str = "Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     pub const TEST_FILE_ID: &str = "7glwEQBT";
 
-    // const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
+    const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_ID: &str = "MWsm3aBL";
+
+    const TEST_FOLDER_NESTED: &str =
+        "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A/folder/IGlBlD6K";
 
     pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_be_bytes([
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
@@ -156,6 +223,35 @@ mod test {
         assert!(folder_key.0 == TEST_FOLDER_KEY_DECODED);
     }
 
+    #[test]
+    fn test_parse_file_url() {
+        let url = Url::parse(TEST_FILE).unwrap();
+
+        let parsed = parse_file_url(&url).expect("failed to parse url");
+        assert!(parsed.file_id == TEST_FILE_ID);
+        assert!(parsed.file_key.key == TEST_FILE_KEY_KEY_DECODED);
+        assert!(parsed.file_key.iv == TEST_FILE_KEY_IV_DECODED);
+        assert!(parsed.file_key.meta_mac == TEST_FILE_META_MAC_DECODED);
+    }
+
+    #[test]
+    fn test_parse_folder_url() {
+        let url = Url::parse(TEST_FOLDER).unwrap();
+
+        let parsed = parse_folder_url(&url).expect("failed to parse url");
+        assert!(parsed.folder_id == "MWsm3aBL");
+        assert!(parsed.folder_key.0 == TEST_FOLDER_KEY_DECODED);
+    }
+
+    #[test]
+    fn test_parse_folder_nested_url() {
+        let url = Url::parse(TEST_FOLDER_NESTED).unwrap();
+
+        let parsed = parse_folder_url(&url).expect("failed to parse url");
+        assert!(parsed.folder_id == "MWsm3aBL");
+        assert!(parsed.folder_key.0 == TEST_FOLDER_KEY_DECODED);
+    }
+
     #[tokio::test]
     async fn download_file() {
         let file_key = FileKey {
@@ -166,7 +262,8 @@ mod test {
 
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            file_id: TEST_FILE_ID.into(),
+            public_file_id: Some(TEST_FILE_ID.into()),
+            node_id: None,
             include_download_url: Some(1),
         }];
         let mut response = client

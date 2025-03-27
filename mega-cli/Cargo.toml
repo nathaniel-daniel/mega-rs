@@ -7,6 +7,11 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 anyhow = "1.0.97"
 argh = "0.1.13"
-mega = { version = "0.0.0", path = "../mega", features = [ "rustls-tls", "easy" ], default-features = false }
+mega = { version = "0.0.0", path = "../mega", features = [ "easy" ], default-features = false }
 nd-util = { git = "https://github.com/nathaniel-daniel/nd-util-rs", version = "0.0.0" }
 tokio = { version = "1.44.1", features = [ "rt-multi-thread", "fs" ] }
+
+[features]
+default = [ "rustls-tls" ]
+native-tls = [ "mega/native-tls" ]
+rustls-tls = [ "mega/rustls-tls" ]

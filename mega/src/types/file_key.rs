@@ -62,6 +62,24 @@ impl FileKey {
 
         Self { key, iv, meta_mac }
     }
+
+    /// Turn this into encoded bytes.
+    pub(crate) fn to_encoded_bytes(&self) -> [u8; KEY_SIZE * 2] {
+        let meta_mac_bytes = self.meta_mac.to_be_bytes();
+        let iv = u64::try_from(self.iv >> 64).unwrap().to_be_bytes();
+
+        let mut buffer = [0; KEY_SIZE * 2];
+        let (iv_buffer, meta_mac_buffer) =
+            buffer[KEY_SIZE..].split_at_mut(std::mem::size_of::<u64>());
+        iv_buffer.copy_from_slice(&iv);
+        meta_mac_buffer.copy_from_slice(&meta_mac_bytes);
+
+        let n2 = u128::from_be_bytes(buffer[KEY_SIZE..].try_into().unwrap());
+        let n1 = self.key ^ n2;
+        buffer[..KEY_SIZE].copy_from_slice(&n1.to_be_bytes());
+
+        buffer
+    }
 }
 
 impl std::str::FromStr for FileKey {
@@ -83,5 +101,37 @@ impl std::str::FromStr for FileKey {
 
         // Length is checked above
         Ok(Self::from_encoded_bytes(input.try_into().unwrap()))
+    }
+}
+
+impl std::fmt::Display for FileKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut buffer = [0; BASE64_LEN];
+        let encoded_len = URL_SAFE_NO_PAD
+            .encode_slice(self.to_encoded_bytes(), &mut buffer)
+            .expect("output buffer should never be too small");
+        let value = std::str::from_utf8(&buffer[..encoded_len]).expect("output should be utf8");
+
+        f.write_str(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::test::*;
+
+    #[test]
+    fn round() {
+        let file_key = FileKey {
+            key: TEST_FILE_KEY_KEY_DECODED,
+            iv: TEST_FILE_KEY_IV_DECODED,
+            meta_mac: TEST_FILE_META_MAC_DECODED,
+        };
+        let file_key_str = file_key.to_string();
+        let new_file_key: FileKey = file_key_str.parse().expect("failed to parse");
+        assert!(file_key.key == new_file_key.key);
+        assert!(file_key.iv == new_file_key.iv);
+        assert!(file_key.meta_mac == new_file_key.meta_mac);
     }
 }

@@ -119,7 +119,8 @@ mod test {
     async fn execute_get_attributes_command() {
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            file_id: TEST_FILE_ID.into(),
+            public_file_id: Some(TEST_FILE_ID.into()),
+            node_id: None,
             include_download_url: None,
         }];
         let mut response = client
@@ -140,7 +141,8 @@ mod test {
         assert!(file_attributes.name == "Doxygen_docs.zip");
 
         let commands = vec![Command::GetAttributes {
-            file_id: TEST_FILE_ID.into(),
+            public_file_id: Some(TEST_FILE_ID.into()),
+            node_id: None,
             include_download_url: Some(1),
         }];
         let mut response = client
@@ -166,7 +168,7 @@ mod test {
         let folder_key = FolderKey(TEST_FOLDER_KEY_DECODED);
 
         let client = Client::new();
-        let commands = vec![Command::FetchNodes { c: 1, r: 1 }];
+        let commands = vec![Command::FetchNodes { c: 1, recursive: 1 }];
         let mut response = client
             .execute_commands(&commands, Some(TEST_FOLDER_ID))
             .await

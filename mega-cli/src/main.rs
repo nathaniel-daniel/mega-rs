@@ -12,6 +12,7 @@ struct Options {
 enum Subcommand {
     Get(self::commands::get::Options),
     VerifyFile(self::commands::verify_file::Options),
+    Ls(self::commands::ls::Options),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,5 +31,6 @@ async fn async_main(options: Options) -> anyhow::Result<()> {
         Subcommand::VerifyFile(options) => {
             self::commands::verify_file::exec(&client, &options).await
         }
+        Subcommand::Ls(options) => self::commands::ls::exec(&client, &options).await,
     }
 }

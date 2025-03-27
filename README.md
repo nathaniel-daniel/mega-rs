@@ -6,7 +6,7 @@ A Rust API for mega
 
 ## Python Binding
 This repository also contains a small Python binding.
-Here's an example of how it may be used:
+Here's an example of how it may be used to download a file:
 ```python
 import mega_py
 import shutil
