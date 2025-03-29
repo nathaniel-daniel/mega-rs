@@ -2,14 +2,26 @@ mod client;
 #[cfg(feature = "easy")]
 mod easy;
 mod file_validator;
+mod parsed_mega_url;
 mod types;
 
 pub use self::client::Client;
 #[cfg(feature = "easy")]
 pub use self::easy::Client as EasyClient;
+#[cfg(feature = "easy")]
+pub use self::easy::FileDownloadReader as EasyFileDownloadReader;
+#[cfg(feature = "easy")]
+pub use self::easy::GetAttributesBuilder as EasyGetAttributesBuilder;
+pub use self::file_validator::FileValidationError;
 pub use self::file_validator::FileValidator;
+pub use self::parsed_mega_url::ParseMegaUrlError;
+pub use self::parsed_mega_url::ParsedMegaFileUrl;
+pub use self::parsed_mega_url::ParsedMegaFolderUrl;
+pub use self::parsed_mega_url::ParsedMegaUrl;
 pub use self::types::Command;
+pub use self::types::DecodeAttributesError;
 pub use self::types::ErrorCode;
+pub use self::types::FetchNodesNodeKind;
 pub use self::types::FetchNodesResponse;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
@@ -18,16 +30,17 @@ pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
 pub use self::types::Response;
 pub use self::types::ResponseData;
+pub use url::Url;
 
 /// The library error type
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// A reqwest Error
-    #[error(transparent)]
+    #[error("http error")]
     Reqwest(#[from] reqwest::Error),
 
     /// A Url Error
-    #[error(transparent)]
+    #[error("url error")]
     Url(#[from] url::ParseError),
 
     /// The returned number of responses did not match what was expected
@@ -37,6 +50,10 @@ pub enum Error {
     /// There was an api error
     #[error("api error")]
     ApiError(#[from] ErrorCode),
+
+    /// Failed to decode attributes
+    #[error("failed to decode attributes")]
+    DecodeAttributes(#[from] DecodeAttributesError),
 
     #[cfg(feature = "easy")]
     #[error("channel closed without response")]
@@ -51,6 +68,32 @@ pub enum Error {
     UnexpectedResponseDataType,
 }
 
+/// Either a file or folder key
+#[derive(Debug, Clone)]
+pub enum FileOrFolderKey {
+    File(FileKey),
+    Folder(FolderKey),
+}
+
+impl FileOrFolderKey {
+    /// Get the key.
+    pub fn key(&self) -> u128 {
+        match self {
+            Self::File(file_key) => file_key.key,
+            Self::Folder(folder_key) => folder_key.0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileOrFolderKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::File(file_key) => file_key.fmt(f),
+            Self::Folder(folder_key) => folder_key.fmt(f),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -59,14 +102,17 @@ mod test {
 
     type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
-    // const TEST_FILE: &str =
-    //    "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
+    pub const TEST_FILE: &str =
+        "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     pub const TEST_FILE_KEY: &str = "Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
     pub const TEST_FILE_ID: &str = "7glwEQBT";
 
-    // const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
+    pub const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_ID: &str = "MWsm3aBL";
+
+    pub const TEST_FOLDER_NESTED: &str =
+        "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A/folder/IGlBlD6K";
 
     pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_be_bytes([
         161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
@@ -105,7 +151,8 @@ mod test {
 
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            file_id: TEST_FILE_ID.into(),
+            public_file_id: Some(TEST_FILE_ID.into()),
+            node_id: None,
             include_download_url: Some(1),
         }];
         let mut response = client

@@ -1,34 +1,7 @@
-[package]
-name = "mega"
-version = "0.0.0"
-edition = "2024"
-license = "MIT OR Apache-2.0"
-
-[dependencies]
-aes = "0.8.4"
-base64 = "0.22.1"
-block-padding = "0.3.3"
-cbc = "0.1.2"
-ctr = "0.9.2"
-ecb = "0.1.2"
-itoa = "1.0.15"
-pin-project-lite = "0.2.16"
-rand = { version = "0.9.0", features = [ "std", "std_rng", "thread_rng" ], default-features = false } 
-reqwest = { version = "0.12.15", features = [ "json", "stream" ] }
-serde = { version = "1.0.219", features = [ "derive" ] }
-serde_json = "1.0.140"
-serde_repr = "0.1.20"
-thiserror = "2.0.12"
-tokio = { version = "1.44.1", features = [ "time" ] }
-tokio-stream = "0.1.17"
-tokio-util = { version = "0.7.14", features = ["io"] }
-url = { version = "2.5.4", features = [ "serde" ] }
-
-[dev-dependencies]
-tokio = { version = "1.44.1", features = [ "macros", "fs" ] }
-
-[features]
-default = ["rustls-tls"]
-native-tls = ["reqwest/native-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
-easy = ["tokio/sync"]
+[workspace]
+resolver = "3"
+members = [
+    "mega",
+    "mega-cli",
+    "mega-py",
+]

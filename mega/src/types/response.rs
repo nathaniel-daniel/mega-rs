@@ -1,5 +1,6 @@
 use crate::ErrorCode;
 use crate::FileKey;
+use crate::FileOrFolderKey;
 use crate::FolderKey;
 use crate::FolderKeyParseError;
 use base64::Engine;
@@ -212,7 +213,9 @@ pub struct FetchNodesNode {
     #[serde(rename = "h")]
     pub id: String,
 
-    /// The key of the node
+    /// The key of the node.
+    ///
+    /// This is encrypted.
     #[serde(rename = "k")]
     pub key: String,
 
@@ -244,11 +247,11 @@ pub struct FetchNodesNode {
 }
 
 impl FetchNodesNode {
-    /// Decode the encoded attributes
-    pub fn decode_attributes(
+    /// Decrypt and get the key.
+    pub fn decrypt_key(
         &self,
         folder_key: &FolderKey,
-    ) -> Result<FileAttributes, DecodeAttributesError> {
+    ) -> Result<FileOrFolderKey, DecodeAttributesError> {
         let (_, key) = self
             .key
             .split_once(':')
@@ -260,23 +263,34 @@ impl FetchNodesNode {
             .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
         let key_len = key.len();
-        let key: u128 = if self.kind == FetchNodesNodeKind::Directory {
+        let key = if self.kind == FetchNodesNodeKind::Directory {
             if key_len != 16 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
             }
 
             // Length check is done above
-            u128::from_be_bytes(key.try_into().unwrap())
+            let folder_key = FolderKey(u128::from_be_bytes(key.try_into().unwrap()));
+            FileOrFolderKey::Folder(folder_key)
         } else {
             if key_len != 32 {
                 return Err(DecodeAttributesError::InvalidKeyLength { length: key_len });
             }
 
             // Length check is done above
-            FileKey::from_encoded_bytes(key.try_into().unwrap()).key
+            let file_key = FileKey::from_encoded_bytes(key.try_into().unwrap());
+            FileOrFolderKey::File(file_key)
         };
 
-        decode_attributes(&self.encoded_attributes, key)
+        Ok(key)
+    }
+
+    /// Decode the encoded attributes.
+    pub fn decode_attributes(
+        &self,
+        folder_key: &FolderKey,
+    ) -> Result<FileAttributes, DecodeAttributesError> {
+        let key = self.decrypt_key(folder_key)?;
+        decode_attributes(&self.encoded_attributes, key.key())
     }
 
     /// Check if this is a file.

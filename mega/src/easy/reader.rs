@@ -1,4 +1,5 @@
 use crate::FileKey;
+use crate::FileValidationError;
 use crate::FileValidator;
 use cbc::cipher::KeyIvInit;
 use cbc::cipher::StreamCipher;
@@ -19,6 +20,7 @@ pin_project! {
         reader: R,
         cipher: Aes128Ctr128BE,
         validator: Option<FileValidator>,
+        validation_result: Option<Result<(), FileValidationError>>,
     }
 }
 
@@ -39,6 +41,7 @@ impl<R> FileDownloadReader<R> {
             reader,
             cipher,
             validator,
+            validation_result: None,
         }
     }
 }
@@ -64,14 +67,27 @@ where
         result?;
 
         let new_bytes = unfilled_buf.filled_mut();
-        this.cipher.apply_keystream(new_bytes);
         let new_bytes_len = new_bytes.len();
+        this.cipher.apply_keystream(new_bytes);
         if let Some(validator) = this.validator.as_mut() {
             if new_bytes_len == 0 {
-                validator.finish().map_err(std::io::Error::other)?;
+                let validation_result = match this.validation_result.clone() {
+                    Some(validation_result) => validation_result,
+                    None => {
+                        let validation_result = validator.finish();
+                        *this.validation_result = Some(validation_result.clone());
+                        validation_result
+                    }
+                };
+
+                validation_result.map_err(std::io::Error::other)?
             } else {
                 validator.feed(new_bytes);
             }
+        }
+        // Safety: This was already initialized via the unfilled_buf sub-buffer.
+        unsafe {
+            buf.assume_init(new_bytes_len);
         }
         buf.advance(new_bytes_len);
 
