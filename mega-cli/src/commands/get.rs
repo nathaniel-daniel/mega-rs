@@ -4,6 +4,7 @@ use anyhow::ensure;
 use mega::Url;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -106,10 +107,33 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .download_file(&file_key, download_url.as_str())
         .await
         .context("failed to get download stream")?;
-    tokio::io::copy(&mut reader, &mut output_file).await?;
+
+    let progress_bar = indicatif::ProgressBar::new(attributes.size);
+    let progress_bar_style_template = "[Time = {elapsed_precise} | ETA = {eta_precise} | Speed = {bytes_per_sec}] {wide_bar} {bytes}/{total_bytes}";
+    let progress_bar_style = indicatif::ProgressStyle::default_bar()
+        .template(progress_bar_style_template)
+        .expect("invalid progress bar style template");
+    progress_bar.set_style(progress_bar_style);
+
+    let progress_bar_tick_handle = {
+        let progress_bar = progress_bar.clone();
+        tokio::spawn(async move {
+            while !progress_bar.is_finished() {
+                progress_bar.tick();
+                tokio::time::sleep(Duration::from_millis(1_000)).await;
+            }
+        })
+    };
+    tokio::io::copy(
+        &mut progress_bar.wrap_async_read(&mut reader),
+        &mut output_file,
+    )
+    .await?;
     output_file.flush().await?;
     output_file.sync_all().await?;
     tokio::fs::rename(temp_output, output).await?;
+
+    progress_bar_tick_handle.await?;
 
     Ok(())
 }
