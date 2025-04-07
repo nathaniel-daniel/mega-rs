@@ -4,6 +4,7 @@ use anyhow::ensure;
 use mega::Url;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -114,6 +115,15 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .expect("invalid progress bar style template");
     progress_bar.set_style(progress_bar_style);
 
+    let progress_bar_tick_handle = {
+        let progress_bar = progress_bar.clone();
+        tokio::spawn(async move {
+            while !progress_bar.is_finished() {
+                progress_bar.tick();
+                tokio::time::sleep(Duration::from_millis(1_000)).await;
+            }
+        })
+    };
     tokio::io::copy(
         &mut progress_bar.wrap_async_read(&mut reader),
         &mut output_file,
@@ -122,6 +132,8 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
     output_file.flush().await?;
     output_file.sync_all().await?;
     tokio::fs::rename(temp_output, output).await?;
+
+    progress_bar_tick_handle.await?;
 
     Ok(())
 }
