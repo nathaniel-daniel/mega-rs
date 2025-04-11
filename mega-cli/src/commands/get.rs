@@ -132,6 +132,7 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
     output_file.flush().await?;
     output_file.sync_all().await?;
     tokio::fs::rename(temp_output, output).await?;
+    progress_bar.finish();
 
     progress_bar_tick_handle.await?;
 
