@@ -24,6 +24,9 @@ jobs:
             target/
           key: ${{ runner.os }}-lint-cargo-${{ hashFiles('**/Cargo.lock') }}
           
+      - name: Use stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+          
       - name: Fmt
         run: cargo fmt --all -- --check
          
@@ -55,6 +58,9 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
+      - name: Use stable toolchain
+        uses: dtolnay/rust-toolchain@stable
           
       - name: Build
         run: cargo build --verbose
