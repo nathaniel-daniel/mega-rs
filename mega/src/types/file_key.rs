@@ -3,7 +3,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 const KEY_SIZE: usize = 16;
 const BASE64_LEN: usize = 43;
-const BASE64_DECODE_BUFFER_LEN: usize = ((BASE64_LEN * 2) + 3) / 4 * 3;
+const BASE64_DECODE_BUFFER_LEN: usize = (BASE64_LEN * 2).div_ceil(4) * 3;
 
 /// An error that may occur while parsing a FileKey.
 #[derive(Debug, thiserror::Error)]
