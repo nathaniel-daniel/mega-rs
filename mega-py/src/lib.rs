@@ -316,6 +316,9 @@ impl FolderEntry {
 /// An API for mega.
 #[pymodule]
 fn mega_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<File>()?;
+    m.add_class::<FileDownload>()?;
+    m.add_class::<FolderEntry>()?;
     m.add_class::<Client>()?;
     Ok(())
 }
