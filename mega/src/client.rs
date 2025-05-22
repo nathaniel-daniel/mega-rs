@@ -119,7 +119,7 @@ mod test {
     async fn execute_get_attributes_command() {
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            public_file_id: Some(TEST_FILE_ID.into()),
+            public_node_id: Some(TEST_FILE_ID.into()),
             node_id: None,
             include_download_url: None,
         }];
@@ -141,7 +141,7 @@ mod test {
         assert!(file_attributes.name == "Doxygen_docs.zip");
 
         let commands = vec![Command::GetAttributes {
-            public_file_id: Some(TEST_FILE_ID.into()),
+            public_node_id: Some(TEST_FILE_ID.into()),
             node_id: None,
             include_download_url: Some(1),
         }];
@@ -180,9 +180,9 @@ mod test {
             ResponseData::FetchNodes(response) => response,
             _ => panic!("unexpected response"),
         };
-        assert!(response.files.len() == 3);
+        assert!(response.nodes.len() == 3);
         let file_attributes = response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "oLkVhYqA")
             .expect("failed to locate file")
@@ -191,7 +191,7 @@ mod test {
         assert!(file_attributes.name == "test");
 
         let file_attributes = response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "kalwUahb")
             .expect("failed to locate file")
@@ -200,7 +200,7 @@ mod test {
         assert!(file_attributes.name == "test.txt");
 
         let file_attributes = &response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "IGlBlD6K")
             .expect("failed to locate file")

@@ -2,14 +2,14 @@
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "a")]
 pub enum Command {
-    /// Get the attributes of a file
+    /// Get the attributes of a node
     #[serde(rename = "g")]
     GetAttributes {
-        /// The public id of the file
+        /// The public id of the node
         #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
-        public_file_id: Option<String>,
+        public_node_id: Option<String>,
 
-        /// The node id of the file
+        /// The id of the node
         #[serde(rename = "n")]
         node_id: Option<String>,
 

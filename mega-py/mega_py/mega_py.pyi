@@ -1,10 +1,9 @@
 import io
 
-class File:
+class Node:
     public_id: str | None
-    node_id: str | None
+    id: str | None
     name: str
-    key: str
 
 class FileDownload(io.RawIOBase): ...
 
@@ -16,6 +15,8 @@ class FolderEntry:
 
 class Client:
     def __init__(self) -> None: ...
-    def get_file(self, url=None, node_id=None, key: str = None) -> File: ...
-    def download_file(self, file: File) -> FileDownload: ...
+    def get_file(
+        self, url: str | None = None, node_id: str | None = None, key: str | None = None
+    ) -> Node: ...
+    def download_file(self, file: Node) -> FileDownload: ...
     def list_folder(self, url: str, recursive: bool = False) -> list[FolderEntry]: ...

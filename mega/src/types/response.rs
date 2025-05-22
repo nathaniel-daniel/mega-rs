@@ -134,7 +134,7 @@ impl GetAttributes {
 #[derive(Debug, serde::Serialize, serde:: Deserialize)]
 pub struct FetchNodes {
     #[serde(rename = "f")]
-    pub files: Vec<FetchNodesNode>,
+    pub nodes: Vec<FetchNodesNode>,
 
     pub noc: u8,
 

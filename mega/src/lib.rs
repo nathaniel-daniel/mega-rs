@@ -83,6 +83,48 @@ impl FileOrFolderKey {
             Self::Folder(folder_key) => folder_key.0,
         }
     }
+
+    /// Get a ref to the file key, if it is one.
+    pub fn as_file_key(&self) -> Option<&FileKey> {
+        match self {
+            Self::File(key) => Some(key),
+            _ => None,
+        }
+    }
+
+    /// Get a ref to the folder key, if it is one.
+    pub fn as_folder_key(&self) -> Option<&FolderKey> {
+        match self {
+            Self::Folder(key) => Some(key),
+            _ => None,
+        }
+    }
+
+    /// Take the file key, if it is one.
+    pub fn take_file_key(self) -> Option<FileKey> {
+        match self {
+            Self::File(key) => Some(key),
+            _ => None,
+        }
+    }
+
+    /// Take the folder key, if it is one.
+    pub fn take_folder_key(self) -> Option<FolderKey> {
+        match self {
+            Self::Folder(key) => Some(key),
+            _ => None,
+        }
+    }
+    
+    /// Check if this is a file key.
+    pub fn is_file_key(&self) -> bool {
+        matches!(self, Self::File(_))
+    }
+    
+    /// Check if this is a folder key.
+    pub fn is_folder_key(&self) -> bool {
+        matches!(self, Self::Folder(_))
+    }
 }
 
 impl std::fmt::Display for FileOrFolderKey {
@@ -91,6 +133,18 @@ impl std::fmt::Display for FileOrFolderKey {
             Self::File(file_key) => file_key.fmt(f),
             Self::Folder(folder_key) => folder_key.fmt(f),
         }
+    }
+}
+
+impl From<FileKey> for FileOrFolderKey {
+    fn from(key: FileKey) -> Self {
+        Self::File(key)
+    }
+}
+
+impl From<FolderKey> for FileOrFolderKey {
+    fn from(key: FolderKey) -> Self {
+        Self::Folder(key)
     }
 }
 
@@ -151,7 +205,7 @@ mod test {
 
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            public_file_id: Some(TEST_FILE_ID.into()),
+            public_node_id: Some(TEST_FILE_ID.into()),
             node_id: None,
             include_download_url: Some(1),
         }];

@@ -104,7 +104,7 @@ impl Client {
         builder: GetAttributesBuilder,
     ) -> impl Future<Output = Result<GetAttributesResponse, Error>> {
         let command = Command::GetAttributes {
-            public_file_id: builder.public_file_id,
+            public_node_id: builder.public_node_id,
             node_id: builder.node_id,
             include_download_url: if builder.include_download_url {
                 Some(1)
@@ -243,7 +243,7 @@ pub struct GetAttributesBuilder {
     /// The public id of the node.
     ///
     /// Mutually exclusive with `node_id`.
-    pub public_file_id: Option<String>,
+    pub public_node_id: Option<String>,
     /// The node id.
     ///
     /// Mutually exclusive with `public_file_id`.
@@ -259,7 +259,7 @@ impl GetAttributesBuilder {
     /// Make a new builder.
     pub fn new() -> Self {
         Self {
-            public_file_id: None,
+            public_node_id: None,
             node_id: None,
             include_download_url: false,
             reference_node_id: None,
@@ -269,14 +269,14 @@ impl GetAttributesBuilder {
     /// Set the public file id.
     ///
     /// Mutually exclusive with `node_id`.
-    pub fn public_file_id(&mut self, value: impl Into<String>) -> &mut Self {
-        self.public_file_id = Some(value.into());
+    pub fn public_node_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.public_node_id = Some(value.into());
         self
     }
 
     /// Set the node id.
     ///
-    /// Mutually exclusive with `public_file_id`.
+    /// Mutually exclusive with `public_node_id`.
     pub fn node_id(&mut self, value: impl Into<String>) -> &mut Self {
         self.node_id = Some(value.into());
         self
@@ -343,9 +343,9 @@ mod test {
             .fetch_nodes(Some(TEST_FOLDER_ID), true)
             .await
             .expect("failed to fetch nodes");
-        assert!(response.files.len() == 3);
+        assert!(response.nodes.len() == 3);
         let file_attributes = response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "oLkVhYqA")
             .expect("failed to locate file")
@@ -354,7 +354,7 @@ mod test {
         assert!(file_attributes.name == "test");
 
         let file_attributes = response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "kalwUahb")
             .expect("failed to locate file")
@@ -363,7 +363,7 @@ mod test {
         assert!(file_attributes.name == "test.txt");
 
         let file_attributes = &response
-            .files
+            .nodes
             .iter()
             .find(|file| file.id == "IGlBlD6K")
             .expect("failed to locate file")
@@ -384,7 +384,7 @@ mod test {
         let mut builder = GetAttributesBuilder::new();
         builder
             .include_download_url(true)
-            .public_file_id(TEST_FILE_ID);
+            .public_node_id(TEST_FILE_ID);
         let attributes = client
             .get_attributes(builder)
             .await
@@ -415,7 +415,7 @@ mod test {
             let mut builder = GetAttributesBuilder::new();
             builder
                 .include_download_url(true)
-                .public_file_id(TEST_FILE_ID);
+                .public_node_id(TEST_FILE_ID);
             let attributes = client
                 .get_attributes(builder)
                 .await
@@ -437,7 +437,7 @@ mod test {
             let mut builder = GetAttributesBuilder::new();
             builder
                 .include_download_url(true)
-                .public_file_id(TEST_FILE_ID);
+                .public_node_id(TEST_FILE_ID);
             let attributes = client
                 .get_attributes(builder)
                 .await
