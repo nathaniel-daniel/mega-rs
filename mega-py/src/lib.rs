@@ -118,6 +118,7 @@ pub struct FolderEntry {
 
     /// The type of node
     #[pyo3(get, name = "type")]
+    #[serde(rename = "type")]
     pub kind: String,
 
     /// The node's key
