@@ -25,6 +25,7 @@ pub use self::types::FetchNodesNodeKind;
 pub use self::types::FetchNodesResponse;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
+pub use self::types::FileOrFolderKey;
 pub use self::types::FolderKey;
 pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
@@ -66,86 +67,6 @@ pub enum Error {
     #[cfg(feature = "easy")]
     #[error("unexpected response data type")]
     UnexpectedResponseDataType,
-}
-
-/// Either a file or folder key
-#[derive(Debug, Clone)]
-pub enum FileOrFolderKey {
-    File(FileKey),
-    Folder(FolderKey),
-}
-
-impl FileOrFolderKey {
-    /// Get the key.
-    pub fn key(&self) -> u128 {
-        match self {
-            Self::File(file_key) => file_key.key,
-            Self::Folder(folder_key) => folder_key.0,
-        }
-    }
-
-    /// Get a ref to the file key, if it is one.
-    pub fn as_file_key(&self) -> Option<&FileKey> {
-        match self {
-            Self::File(key) => Some(key),
-            _ => None,
-        }
-    }
-
-    /// Get a ref to the folder key, if it is one.
-    pub fn as_folder_key(&self) -> Option<&FolderKey> {
-        match self {
-            Self::Folder(key) => Some(key),
-            _ => None,
-        }
-    }
-
-    /// Take the file key, if it is one.
-    pub fn take_file_key(self) -> Option<FileKey> {
-        match self {
-            Self::File(key) => Some(key),
-            _ => None,
-        }
-    }
-
-    /// Take the folder key, if it is one.
-    pub fn take_folder_key(self) -> Option<FolderKey> {
-        match self {
-            Self::Folder(key) => Some(key),
-            _ => None,
-        }
-    }
-
-    /// Check if this is a file key.
-    pub fn is_file_key(&self) -> bool {
-        matches!(self, Self::File(_))
-    }
-
-    /// Check if this is a folder key.
-    pub fn is_folder_key(&self) -> bool {
-        matches!(self, Self::Folder(_))
-    }
-}
-
-impl std::fmt::Display for FileOrFolderKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::File(file_key) => file_key.fmt(f),
-            Self::Folder(folder_key) => folder_key.fmt(f),
-        }
-    }
-}
-
-impl From<FileKey> for FileOrFolderKey {
-    fn from(key: FileKey) -> Self {
-        Self::File(key)
-    }
-}
-
-impl From<FolderKey> for FileOrFolderKey {
-    fn from(key: FolderKey) -> Self {
-        Self::Folder(key)
-    }
 }
 
 #[cfg(test)]

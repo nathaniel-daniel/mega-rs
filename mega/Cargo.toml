@@ -28,7 +28,7 @@ url = { version = "2.5.4", features = [ "serde" ] }
 tokio = { version = "1.44.2", features = [ "macros", "fs" ] }
 
 [features]
-default = ["rustls-tls"]
-native-tls = ["reqwest/native-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
-easy = ["tokio/sync"]
+default = [ "rustls-tls" ]
+native-tls = [ "reqwest/native-tls" ]
+rustls-tls = [ "reqwest/rustls-tls" ]
+easy = [ "tokio/sync" ]

@@ -2,7 +2,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 const KEY_SIZE: usize = 16;
-const BASE64_LEN: usize = 22;
+pub(crate) const BASE64_LEN: usize = 22;
 const BASE64_DECODE_BUFFER_LEN: usize = (BASE64_LEN * 2).div_ceil(4) * 3;
 
 /// An error that may occur while parsing a FolderKey.
@@ -24,7 +24,8 @@ pub enum ParseError {
 /// The encryption key for a folder.
 ///
 /// This is a 128 bit AES key.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(into = "String", try_from = "String")]
 pub struct FolderKey(pub u128);
 
 impl std::str::FromStr for FolderKey {
@@ -61,6 +62,20 @@ impl std::fmt::Display for FolderKey {
         let value = std::str::from_utf8(&buffer[..encoded_len]).expect("output should be utf8");
 
         f.write_str(value)
+    }
+}
+
+impl From<FolderKey> for String {
+    fn from(key: FolderKey) -> Self {
+        key.to_string()
+    }
+}
+
+impl TryFrom<String> for FolderKey {
+    type Error = <Self as std::str::FromStr>::Err;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
     }
 }
 

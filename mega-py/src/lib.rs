@@ -7,6 +7,8 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use pythonize::depythonize;
+use pythonize::pythonize;
 use std::pin::Pin;
 use std::sync::LazyLock;
 use tokio::io::AsyncRead;
@@ -52,6 +54,7 @@ where
 
 /// A mega node, a file or folder
 #[pyclass]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Node {
     /// The public id of a node.
     #[pyo3(get)]
@@ -76,6 +79,19 @@ pub struct Node {
 
 #[pymethods]
 impl Node {
+    /// Serialize this as a dict.
+    pub fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let value = pythonize(py, self)?;
+        Ok(value)
+    }
+
+    /// Deserialize this from a dict.
+    #[staticmethod]
+    pub fn from_dict(value: Bound<'_, PyAny>) -> PyResult<Self> {
+        let value = depythonize(&value)?;
+        Ok(value)
+    }
+
     pub fn __repr__(&self) -> String {
         let public_id = DisplayPythonOptional(self.public_id.as_deref());
         let id = DisplayPythonOptional(self.id.as_deref());
