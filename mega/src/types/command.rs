@@ -22,6 +22,7 @@ pub enum Command {
     #[serde(rename = "f")]
     FetchNodes {
         c: u8,
+
         /// Set to 1 to make this recursive.
         /// Otherwise, leave it as 0.
         #[serde(rename = "r")]

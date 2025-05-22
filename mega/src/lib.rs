@@ -115,12 +115,12 @@ impl FileOrFolderKey {
             _ => None,
         }
     }
-    
+
     /// Check if this is a file key.
     pub fn is_file_key(&self) -> bool {
         matches!(self, Self::File(_))
     }
-    
+
     /// Check if this is a folder key.
     pub fn is_folder_key(&self) -> bool {
         matches!(self, Self::Folder(_))

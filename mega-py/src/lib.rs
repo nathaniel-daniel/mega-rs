@@ -68,10 +68,10 @@ pub struct Node {
     key: FileOrFolderKey,
 
     /// The public id of the parent folder
-    parent_public_node_id: Option<String>,
+    parent_public_id: Option<String>,
 
     /// The key of the parent folder
-    parent_node_key: Option<FolderKey>,
+    parent_key: Option<FolderKey>,
 }
 
 #[pymethods]
@@ -81,10 +81,10 @@ impl Node {
         let id = DisplayPythonOptional(self.id.as_deref());
         let name = &self.name;
         let key = &self.key;
-        let parent_public_node_id = DisplayPythonOptional(self.parent_public_node_id.as_deref());
-        let parent_node_key = DisplayPythonOptional(self.parent_node_key.as_ref());
+        let parent_public_id = DisplayPythonOptional(self.parent_public_id.as_deref());
+        let parent_key = DisplayPythonOptional(self.parent_key.as_ref());
 
-        format!("File(public_id={public_id:?}, id={id:?}, name={name:?}, parent_public_node_id={parent_public_node_id:?}, key={key:?}, parent_node_key={parent_node_key:?})")
+        format!("File(public_id={public_id:?}, id={id:?}, name={name:?}, parent_public_id={parent_public_id:?}, key={key:?}, parent_key={parent_key:?})")
     }
 }
 
@@ -131,8 +131,8 @@ impl Client {
                     name: decoded_attributes.name,
 
                     key: file_url.file_key.into(),
-                    parent_public_node_id: None,
-                    parent_node_key: None,
+                    parent_public_id: None,
+                    parent_key: None,
                 })
             }
             ParsedMegaUrl::Folder(folder_url) => match folder_url.child_data {
@@ -173,8 +173,8 @@ impl Client {
                         name: decoded_attributes.name,
 
                         key: node_key,
-                        parent_public_node_id: Some(folder_url.folder_id),
-                        parent_node_key: Some(folder_url.folder_key),
+                        parent_public_id: Some(folder_url.folder_id),
+                        parent_key: Some(folder_url.folder_key),
                     })
                 }
                 None => {
@@ -201,8 +201,8 @@ impl Client {
                         name: decoded_attributes.name,
 
                         key: folder_url.folder_key.into(),
-                        parent_public_node_id: Some(folder_url.folder_id),
-                        parent_node_key: Some(folder_url.folder_key),
+                        parent_public_id: Some(folder_url.folder_id),
+                        parent_key: Some(folder_url.folder_key),
                     })
                 }
             },
@@ -292,8 +292,8 @@ impl Client {
             name: decoded_attributes.name,
 
             key: file_key.into(),
-            parent_public_node_id: None,
-            parent_node_key: None,
+            parent_public_id: None,
+            parent_key: None,
         })
     }
 
@@ -315,8 +315,8 @@ impl Client {
             if let Some(id) = file.id.as_ref() {
                 builder.node_id(id);
             }
-            if let Some(parent_public_node_id) = file.parent_public_node_id.clone() {
-                builder.reference_node_id(parent_public_node_id);
+            if let Some(parent_public_id) = file.parent_public_id.clone() {
+                builder.reference_node_id(parent_public_id);
             }
 
             let attributes = self
@@ -340,46 +340,43 @@ impl Client {
         Ok(FileDownload { reader })
     }
 
-    /// List a folder.
-    #[pyo3(signature = (url, recursive = false))]
-    pub fn list_folder(&self, url: &str, recursive: bool) -> PyResult<Vec<FolderEntry>> {
-        let url = Url::parse(url).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    /// List files in a folder.
+    ///
+    /// This will work off of the parent node of the provided node.
+    #[pyo3(signature = (node, recursive = false))]
+    pub fn list_files(&self, node: &Node, recursive: bool) -> PyResult<Vec<FolderEntry>> {
         let tokio_rt = get_tokio_rt()?;
 
-        let parsed_url = mega::ParsedMegaUrl::try_from(&url)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        let parsed_url = parsed_url
-            .as_folder_url()
-            .ok_or_else(|| PyValueError::new_err("url must be a folder url"))?;
+        let parent_key = node
+            .parent_key
+            .ok_or_else(|| PyRuntimeError::new_err("missing parent public key"))?;
+        let public_node_id = node
+            .parent_public_id
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("missing parent public node id"))?;
 
-        if parsed_url.child_data.is_some() {
-            return Err(PyValueError::new_err(
-                "folder urls with child data are currently unsupported",
-            ));
-        }
-
-        let response = tokio_rt
+        let fetch_nodes_response = tokio_rt
             .block_on(async {
                 self.client
-                    .fetch_nodes(Some(&parsed_url.folder_id), recursive)
+                    .fetch_nodes(Some(public_node_id), recursive)
                     .await
             })
             .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
         let mut items = Vec::new();
-        for item in response.nodes.into_iter() {
-            let key = item
-                .decrypt_key(&parsed_url.folder_key)
+        for node in fetch_nodes_response.nodes.into_iter() {
+            let key = node
+                .decrypt_key(&parent_key)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
-            let attributes = item
-                .decode_attributes(&parsed_url.folder_key)
+            let attributes = node
+                .decode_attributes(&parent_key)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
             items.push(FolderEntry {
-                id: item.id,
+                id: node.id,
                 name: attributes.name,
                 key,
-                kind: match item.kind {
+                kind: match node.kind {
                     mega::FetchNodesNodeKind::File => "file".into(),
                     mega::FetchNodesNodeKind::Directory => "folder".into(),
                     _ => "unknown".to_string(),
