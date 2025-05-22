@@ -71,7 +71,8 @@ pub struct Node {
     key: FileOrFolderKey,
 
     /// The public id of the parent folder
-    parent_public_id: Option<String>,
+    #[pyo3(get)]
+    pub parent_public_id: Option<String>,
 
     /// The key of the parent folder
     parent_key: Option<FolderKey>,
@@ -82,6 +83,11 @@ impl Node {
     #[getter]
     pub fn key(&self) -> String {
         self.key.to_string()
+    }
+    
+    #[getter]
+    pub fn parent_key(&self) -> String {
+        self.parent_key.to_string()
     }
 
     /// Serialize this as a dict.
