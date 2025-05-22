@@ -106,6 +106,7 @@ impl Node {
 
 /// An entry in a folder listing
 #[pyclass]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct FolderEntry {
     /// The id of the node
     #[pyo3(get)]
@@ -125,6 +126,11 @@ pub struct FolderEntry {
 
 #[pymethods]
 impl FolderEntry {
+    #[getter]
+    pub fn key(&self) -> String {
+        self.key.to_string()
+    }
+
     /// Try to turn this into a Node.
     pub fn as_node(&self, parent: &str) -> PyResult<Node> {
         let url = Url::parse(parent).map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
@@ -145,9 +151,17 @@ impl FolderEntry {
         })
     }
 
-    #[getter]
-    pub fn key(&self) -> String {
-        self.key.to_string()
+    /// Serialize this as a dict.
+    pub fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let value = pythonize(py, self)?;
+        Ok(value)
+    }
+
+    /// Deserialize this from a dict.
+    #[staticmethod]
+    pub fn from_dict(value: Bound<'_, PyAny>) -> PyResult<Self> {
+        let value = depythonize(&value)?;
+        Ok(value)
     }
 
     pub fn __repr__(&self) -> String {
