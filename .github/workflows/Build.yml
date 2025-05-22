@@ -1,5 +1,5 @@
 name: Rust
-'on':
+"on":
   push:
     branches:
       - master
@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Cache
         uses: actions/cache@v4
         with:
@@ -23,31 +23,31 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-lint-cargo-${{ hashFiles('**/Cargo.lock') }}
-          
+
       - name: Use stable toolchain
         uses: dtolnay/rust-toolchain@stable
-          
+
       - name: Fmt
         run: cargo fmt --all -- --check
-         
+
       - name: Clippy
         run: cargo clippy --tests --all --all-features -- -D warnings
-          
+
   deny:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Deny
         uses: EmbarkStudios/cargo-deny-action@v2
-        
+
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Cache
         uses: actions/cache@v4
         with:
@@ -58,18 +58,18 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
-          
+
       - name: Use stable toolchain
         uses: dtolnay/rust-toolchain@stable
-          
+
       - name: Build
         run: cargo build --verbose
-        
+
       - name: Build with "easy" feature
         run: cargo build --features=easy --verbose
 
       - name: Run Tests
         run: cargo test --all --verbose
-        
+
       - name: Run Tests with "easy" feature
         run: cargo test --all --features=easy --verbose
