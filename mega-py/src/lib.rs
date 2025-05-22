@@ -176,7 +176,7 @@ impl FolderEntry {
         let key = &self.key;
         let kind = &self.kind;
 
-        format!("FolderEntry(id={id:?}, parent_id={parent_id:?},name={name:?}, key=\"{key}\", type=\"{kind}\")")
+        format!("FolderEntry(id={id:?}, parent_id={parent_id:?}, name={name:?}, key=\"{key}\", type=\"{kind}\")")
     }
 }
 
