@@ -4,6 +4,9 @@ class Node:
     public_id: str | None
     id: str | None
     name: str
+    key: str
+    parent_public_id: str | None
+    parent_key: str | None
 
     def as_dict(self) -> dict[str, object]: ...
     @staticmethod
