@@ -53,7 +53,7 @@ where
 }
 
 /// A mega node, a file or folder
-#[pyclass]
+#[pyclass(module = "mega_py")]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Node {
     /// The public id of a node.
@@ -105,7 +105,7 @@ impl Node {
 }
 
 /// An entry in a folder listing
-#[pyclass]
+#[pyclass(module = "mega_py")]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FolderEntry {
     /// The id of the node
@@ -175,7 +175,7 @@ impl FolderEntry {
     }
 }
 
-#[pyclass]
+#[pyclass(module = "mega_py")]
 pub struct Client {
     client: mega::EasyClient,
 }
@@ -475,7 +475,7 @@ impl Client {
     }
 }
 
-#[pyclass]
+#[pyclass(module = "mega_py")]
 pub struct FileDownload {
     reader: EasyFileDownloadReader<Pin<Box<dyn AsyncRead + Send + Sync>>>,
 }
