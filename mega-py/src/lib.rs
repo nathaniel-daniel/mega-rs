@@ -84,10 +84,10 @@ impl Node {
     pub fn key(&self) -> String {
         self.key.to_string()
     }
-    
+
     #[getter]
-    pub fn parent_key(&self) -> String {
-        self.parent_key.to_string()
+    pub fn parent_key(&self) -> Option<String> {
+        self.parent_key.map(|key| key.to_string())
     }
 
     /// Serialize this as a dict.
