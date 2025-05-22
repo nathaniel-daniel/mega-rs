@@ -104,6 +104,62 @@ impl Node {
     }
 }
 
+/// An entry in a folder listing
+#[pyclass]
+pub struct FolderEntry {
+    /// The id of the node
+    #[pyo3(get)]
+    pub id: String,
+
+    /// The name of the node
+    #[pyo3(get)]
+    pub name: String,
+
+    /// The type of node
+    #[pyo3(get, name = "type")]
+    pub kind: String,
+
+    /// The node's key
+    key: mega::FileOrFolderKey,
+}
+
+#[pymethods]
+impl FolderEntry {
+    /// Try to turn this into a Node.
+    pub fn as_node(&self, parent: &str) -> PyResult<Node> {
+        let url = Url::parse(parent).map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+        let url = ParsedMegaUrl::try_from(&url)
+            .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+        let folder_url = url
+            .as_folder_url()
+            .ok_or_else(|| PyRuntimeError::new_err("parent is not a folder url"))?;
+
+        Ok(Node {
+            public_id: None,
+            id: Some(self.id.clone()),
+            name: self.name.clone(),
+
+            key: self.key.clone(),
+            parent_public_id: Some(folder_url.folder_id.clone()),
+            parent_key: Some(folder_url.folder_key),
+        })
+    }
+
+    #[getter]
+    pub fn key(&self) -> String {
+        self.key.to_string()
+    }
+
+    pub fn __repr__(&self) -> String {
+        let id = &self.id;
+        let name = &self.name;
+        let key = &self.key;
+        let kind = &self.kind;
+
+        format!("FolderEntry(id={id:?}, name={name:?}, key=\"{key}\", type=\"{kind}\")")
+    }
+}
+
 #[pyclass]
 pub struct Client {
     client: mega::EasyClient,
@@ -442,36 +498,6 @@ impl FileDownload {
         })?;
 
         Ok(PyBytes::new(py, &buffer))
-    }
-}
-
-/// A folder listing item
-#[pyclass]
-pub struct FolderEntry {
-    #[pyo3(get)]
-    pub id: String,
-    #[pyo3(get)]
-    pub name: String,
-    #[pyo3(get, name = "type")]
-    pub kind: String,
-
-    key: mega::FileOrFolderKey,
-}
-
-#[pymethods]
-impl FolderEntry {
-    #[getter]
-    pub fn key(&self) -> String {
-        self.key.to_string()
-    }
-
-    pub fn __repr__(&self) -> String {
-        let id = &self.id;
-        let name = &self.name;
-        let key = &self.key;
-        let kind = &self.kind;
-
-        format!("FolderEntry(id={id:?}, name={name:?}, key=\"{key}\", type=\"{kind}\")")
     }
 }
 
