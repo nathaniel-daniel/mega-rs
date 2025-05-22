@@ -79,6 +79,11 @@ pub struct Node {
 
 #[pymethods]
 impl Node {
+    #[getter]
+    pub fn key(&self) -> String {
+        self.key.to_string()
+    }
+
     /// Serialize this as a dict.
     pub fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = pythonize(py, self)?;

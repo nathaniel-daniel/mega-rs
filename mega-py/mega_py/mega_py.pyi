@@ -4,6 +4,7 @@ class Node:
     public_id: str | None
     id: str | None
     name: str
+    key: str
 
     def as_dict(self) -> dict[str, object]: ...
     @staticmethod
