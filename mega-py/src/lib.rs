@@ -112,6 +112,10 @@ pub struct FolderEntry {
     #[pyo3(get)]
     pub id: String,
 
+    /// The id of the parent node
+    #[pyo3(get)]
+    pub parent_id: String,
+
     /// The name of the node
     #[pyo3(get)]
     pub name: String,
@@ -167,11 +171,12 @@ impl FolderEntry {
 
     pub fn __repr__(&self) -> String {
         let id = &self.id;
+        let parent_id = &self.parent_id;
         let name = &self.name;
         let key = &self.key;
         let kind = &self.kind;
 
-        format!("FolderEntry(id={id:?}, name={name:?}, key=\"{key}\", type=\"{kind}\")")
+        format!("FolderEntry(id={id:?}, parent_id={parent_id:?},name={name:?}, key=\"{key}\", type=\"{kind}\")")
     }
 }
 
@@ -461,6 +466,7 @@ impl Client {
 
             items.push(FolderEntry {
                 id: node.id,
+                parent_id: node.parent_id,
                 name: attributes.name,
                 key,
                 kind: match node.kind {

@@ -13,6 +13,7 @@ class FileDownload(io.RawIOBase): ...
 
 class FolderEntry:
     id: str
+    parent_id: str
     name: str
     type: str
     key: str
