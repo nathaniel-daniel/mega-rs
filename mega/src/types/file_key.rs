@@ -2,7 +2,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 const KEY_SIZE: usize = 16;
-const BASE64_LEN: usize = 43;
+pub(crate) const BASE64_LEN: usize = 43;
 const BASE64_DECODE_BUFFER_LEN: usize = (BASE64_LEN * 2).div_ceil(4) * 3;
 
 /// An error that may occur while parsing a FileKey.
@@ -27,7 +27,8 @@ pub enum ParseError {
 /// * The 128 bit AES key
 /// * The IV
 /// * The meta mac
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(into = "String", try_from = "String")]
 pub struct FileKey {
     /// The 128 bit AES key
     pub key: u128,
@@ -113,6 +114,20 @@ impl std::fmt::Display for FileKey {
         let value = std::str::from_utf8(&buffer[..encoded_len]).expect("output should be utf8");
 
         f.write_str(value)
+    }
+}
+
+impl From<FileKey> for String {
+    fn from(key: FileKey) -> Self {
+        key.to_string()
+    }
+}
+
+impl TryFrom<String> for FileKey {
+    type Error = <Self as std::str::FromStr>::Err;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
     }
 }
 

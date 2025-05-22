@@ -29,7 +29,7 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .await
         .context("failed to fetch")?;
 
-    for node in response.files.iter() {
+    for node in response.nodes.iter() {
         let decoded_attributes = node.decode_attributes(&parsed_url.folder_key)?;
         let key = node.decrypt_key(&parsed_url.folder_key)?;
 

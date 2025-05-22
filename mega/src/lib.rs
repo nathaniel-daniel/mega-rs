@@ -25,6 +25,7 @@ pub use self::types::FetchNodesNodeKind;
 pub use self::types::FetchNodesResponse;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
+pub use self::types::FileOrFolderKey;
 pub use self::types::FolderKey;
 pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
@@ -66,32 +67,6 @@ pub enum Error {
     #[cfg(feature = "easy")]
     #[error("unexpected response data type")]
     UnexpectedResponseDataType,
-}
-
-/// Either a file or folder key
-#[derive(Debug, Clone)]
-pub enum FileOrFolderKey {
-    File(FileKey),
-    Folder(FolderKey),
-}
-
-impl FileOrFolderKey {
-    /// Get the key.
-    pub fn key(&self) -> u128 {
-        match self {
-            Self::File(file_key) => file_key.key,
-            Self::Folder(folder_key) => folder_key.0,
-        }
-    }
-}
-
-impl std::fmt::Display for FileOrFolderKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::File(file_key) => file_key.fmt(f),
-            Self::Folder(folder_key) => folder_key.fmt(f),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -151,7 +126,7 @@ mod test {
 
         let client = Client::new();
         let commands = vec![Command::GetAttributes {
-            public_file_id: Some(TEST_FILE_ID.into()),
+            public_node_id: Some(TEST_FILE_ID.into()),
             node_id: None,
             include_download_url: Some(1),
         }];

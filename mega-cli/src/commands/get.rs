@@ -27,7 +27,7 @@ pub struct Options {
 pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Result<()> {
     // If it starts with a url, assume it's a url.
     // Otherwise, assume it's a raw id.
-    let mut public_file_id = None;
+    let mut public_node_id = None;
     let mut node_id = None;
     let mut file_key = None;
     if options.input.starts_with("https://mega.nz") {
@@ -36,7 +36,7 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
 
         match parsed_url {
             mega::ParsedMegaUrl::File(file_url) => {
-                public_file_id = Some(file_url.file_id.to_string());
+                public_node_id = Some(file_url.file_id.to_string());
                 file_key = Some(file_url.file_key.clone());
             }
             mega::ParsedMegaUrl::Folder(folder_url) => {
@@ -66,8 +66,8 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
 
     let mut builder = mega::EasyGetAttributesBuilder::new();
     builder.include_download_url(true);
-    if let Some(public_file_id) = public_file_id {
-        builder.public_file_id(public_file_id);
+    if let Some(public_node_id) = public_node_id {
+        builder.public_node_id(public_node_id);
     }
     if let Some(node_id) = node_id {
         builder.node_id(node_id);
