@@ -1,5 +1,4 @@
 use anyhow::Context;
-use anyhow::bail;
 use anyhow::ensure;
 use mega::Url;
 use std::path::Path;
@@ -30,6 +29,7 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
     let mut public_node_id = None;
     let mut node_id = None;
     let mut file_key = None;
+    let mut reference_node_id = None;
     if options.input.starts_with("https://mega.nz") {
         let url = Url::parse(options.input.as_str()).context("invalid url")?;
         let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("failed to parse mega url")?;
@@ -43,17 +43,32 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
                 let child_data = folder_url
                     .child_data
                     .as_ref()
-                    .context("folder urls without child data are currently unsupported")?;
+                    .context("folder downloads are currently unsupported")?;
                 ensure!(
                     child_data.is_file,
-                    "folder child data is currently unsupported"
+                    "folder downloads are currently unsupported"
                 );
 
-                bail!("folder urls are currently unsupported");
+                let fetch_nodes_response = client
+                    .fetch_nodes(Some(&folder_url.folder_id), true)
+                    .await?;
+                let node_entry = fetch_nodes_response
+                    .nodes
+                    .iter()
+                    .find(|node| node.id == child_data.node_id)
+                    .context("missing file node in folder listing")?;
+                let node_key = node_entry
+                    .decrypt_key(&folder_url.folder_key)?
+                    .take_file_key()
+                    .context("folder downloads are currently unsupported")?;
+
+                node_id = Some(child_data.node_id.to_string());
+                file_key = Some(node_key.clone());
+                reference_node_id = Some(folder_url.folder_id);
             }
         }
     } else {
-        node_id = Some(options.input.as_str());
+        node_id = Some(options.input.to_string());
     };
 
     let file_key = options
@@ -72,7 +87,11 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
     if let Some(node_id) = node_id {
         builder.node_id(node_id);
     }
-    if let Some(reference_node_id) = options.reference_node_id.as_ref() {
+    if let Some(reference_node_id) = options
+        .reference_node_id
+        .as_ref()
+        .or(reference_node_id.as_ref())
+    {
         builder.reference_node_id(reference_node_id);
     }
 
