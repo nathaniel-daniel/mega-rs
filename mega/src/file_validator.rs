@@ -34,7 +34,7 @@ impl std::fmt::Display for HexSlice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "0x")?;
         for byte in self.0.iter() {
-            write!(f, "{:X}", byte)?;
+            write!(f, "{byte:X}")?;
         }
         Ok(())
     }
