@@ -19,6 +19,9 @@ enum Subcommand {
 
     #[command(name = "ls")]
     Ls(self::commands::ls::Options),
+
+    #[command(name = "generate-completions")]
+    GenerateCompletions(self::commands::generate_completions::Options),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -38,5 +41,8 @@ async fn async_main(options: Options) -> anyhow::Result<()> {
             self::commands::verify_file::exec(&client, &options).await
         }
         Subcommand::Ls(options) => self::commands::ls::exec(&client, &options).await,
+        Subcommand::GenerateCompletions(options) => {
+            self::commands::generate_completions::exec(options)
+        }
     }
 }

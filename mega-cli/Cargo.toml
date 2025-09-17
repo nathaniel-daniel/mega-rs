@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.47", features = ["derive"] }
+clap_complete = "4.5.58"
 indicatif = { version = "0.18.0", features = [ "tokio" ] }
 mega = { version = "0.0.0", path = "../mega", features = [ "easy" ], default-features = false }
 nd-util = { git = "https://github.com/nathaniel-daniel/nd-util-rs", version = "0.0.0" }
