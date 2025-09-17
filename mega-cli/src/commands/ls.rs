@@ -76,33 +76,32 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .context("failed to fetch")?;
 
     let mut children = HashSet::new();
-    if options.recursive {
-        if let Some(parent_id) = parent_id {
-            let mut stack = vec![parent_id];
-            while let Some(node_id) = stack.pop() {
-                for node in response.nodes.iter() {
-                    if !children.contains(node.parent_id.as_str()) {
-                        continue;
-                    }
-                    if !node.kind.is_dir() {
-                        continue;
-                    }
-
-                    stack.push(&node.id);
+    if options.recursive
+        && let Some(parent_id) = parent_id
+    {
+        let mut stack = vec![parent_id];
+        while let Some(node_id) = stack.pop() {
+            for node in response.nodes.iter() {
+                if !children.contains(node.parent_id.as_str()) {
+                    continue;
                 }
-                children.insert(node_id);
+                if !node.kind.is_dir() {
+                    continue;
+                }
+
+                stack.push(&node.id);
             }
+            children.insert(node_id);
         }
     }
 
     let mut entries = Vec::with_capacity(response.nodes.len());
     for node in response.nodes.iter() {
-        if let Some(parent_id) = parent_id {
-            if (options.recursive && !children.contains(node.parent_id.as_str()))
-                || (node.parent_id != parent_id)
-            {
-                continue;
-            }
+        if let Some(parent_id) = parent_id
+            && ((options.recursive && !children.contains(node.parent_id.as_str()))
+                || (node.parent_id != parent_id))
+        {
+            continue;
         }
 
         let decoded_attributes = node.decode_attributes(&parsed_url.folder_key)?;
