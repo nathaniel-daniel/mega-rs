@@ -18,3 +18,4 @@ pub use self::response::FetchNodesNodeKind;
 pub use self::response::GetAttributes as GetAttributesResponse;
 pub use self::response::Response;
 pub use self::response::ResponseData;
+pub use self::response::FileAttributes;

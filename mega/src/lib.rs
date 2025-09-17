@@ -31,6 +31,7 @@ pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
 pub use self::types::Response;
 pub use self::types::ResponseData;
+pub use self::types::FileAttributes;
 pub use url::Url;
 
 /// The library error type
