@@ -1,16 +1,16 @@
 use anyhow::Context;
+use clap::Parser;
 use mega::Url;
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "verify-file", description = "verify a file")]
+#[derive(Debug, Parser)]
+#[command(about = "Verify a file")]
 pub struct Options {
-    #[argh(positional)]
     input: PathBuf,
 
-    #[argh(option, description = "the url where this file came from")]
+    #[arg(short = 'u', long = "url", help = "The url where this file came from")]
     url: String,
 }
 

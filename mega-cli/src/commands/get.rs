@@ -1,5 +1,6 @@
 use anyhow::Context;
 use anyhow::ensure;
+use clap::Parser;
 use mega::Url;
 use std::path::Path;
 use std::path::PathBuf;
@@ -7,19 +8,17 @@ use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "get", description = "download a file")]
+#[derive(Parser, Debug)]
+#[command(about = "Download a file")]
 pub struct Options {
-    #[argh(positional)]
     input: String,
 
-    #[argh(positional)]
     output: Option<PathBuf>,
 
-    #[argh(option, description = "the file key")]
+    #[arg(short = 'k', long = "key", help = "The file key")]
     key: Option<String>,
 
-    #[argh(option, description = "the reference node id")]
+    #[arg(long = "reference-node-id", help = "The reference node id")]
     reference_node_id: Option<String>,
 }
 

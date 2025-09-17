@@ -1,14 +1,24 @@
 use anyhow::Context;
 use anyhow::bail;
+use clap::Parser;
 use mega::Url;
 use std::collections::HashSet;
 use std::io::Write;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 enum OutputFormat {
     #[default]
     Human,
     Json,
+}
+
+impl OutputFormat {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Human => "human",
+            Self::Json => "json",
+        }
+    }
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -23,23 +33,27 @@ impl std::str::FromStr for OutputFormat {
     }
 }
 
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "ls", description = "list a folder")]
+impl std::fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Parser)]
+#[command(about = "List a folder")]
 pub struct Options {
-    #[argh(positional)]
     input: String,
 
-    #[argh(switch, description = "whether to list recursively")]
+    #[arg(short = 'r', long = "recursive", help = "Whether to list recursively")]
     recursive: bool,
 
-    #[argh(switch, description = "whether to leave the output unsorted")]
+    #[arg(long = "unsorted", help = "Whether to leave the output unsorted")]
     unsorted: bool,
 
-    #[argh(
-        option,
+    #[arg(
         long = "output-format",
-        description = "specify the output format",
-        default = "Default::default()"
+        help = "Specify the output format",
+        default_value_t = Default::default(),
     )]
     output_format: OutputFormat,
 }

@@ -1,22 +1,28 @@
 mod commands;
 
-#[derive(argh::FromArgs)]
-#[argh(description = "a CLI for mega")]
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = "A CLI for mega")]
 struct Options {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     subcommand: Subcommand,
 }
 
-#[derive(argh::FromArgs)]
-#[argh(subcommand)]
+#[derive(Parser, Debug)]
 enum Subcommand {
+    #[command(name = "get")]
     Get(self::commands::get::Options),
+
+    #[command(name = "verify-file")]
     VerifyFile(self::commands::verify_file::Options),
+
+    #[command(name = "ls")]
     Ls(self::commands::ls::Options),
 }
 
 fn main() -> anyhow::Result<()> {
-    let options = argh::from_env();
+    let options = Options::parse();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
