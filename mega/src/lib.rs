@@ -23,6 +23,7 @@ pub use self::types::DecodeAttributesError;
 pub use self::types::ErrorCode;
 pub use self::types::FetchNodesNodeKind;
 pub use self::types::FetchNodesResponse;
+pub use self::types::FileAttributes;
 pub use self::types::FileKey;
 pub use self::types::FileKeyParseError;
 pub use self::types::FileOrFolderKey;
@@ -31,7 +32,6 @@ pub use self::types::FolderKeyParseError;
 pub use self::types::GetAttributesResponse;
 pub use self::types::Response;
 pub use self::types::ResponseData;
-pub use self::types::FileAttributes;
 pub use url::Url;
 
 /// The library error type

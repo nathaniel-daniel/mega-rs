@@ -15,7 +15,7 @@ pub use self::folder_key::ParseError as FolderKeyParseError;
 pub use self::response::DecodeAttributesError;
 pub use self::response::FetchNodes as FetchNodesResponse;
 pub use self::response::FetchNodesNodeKind;
+pub use self::response::FileAttributes;
 pub use self::response::GetAttributes as GetAttributesResponse;
 pub use self::response::Response;
 pub use self::response::ResponseData;
-pub use self::response::FileAttributes;
