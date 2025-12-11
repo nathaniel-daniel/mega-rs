@@ -1,14 +1,24 @@
 use anyhow::Context;
 use anyhow::bail;
+use clap::Parser;
 use mega::Url;
 use std::collections::HashSet;
 use std::io::Write;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 enum OutputFormat {
     #[default]
     Human,
     Json,
+}
+
+impl OutputFormat {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Human => "human",
+            Self::Json => "json",
+        }
+    }
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -23,23 +33,27 @@ impl std::str::FromStr for OutputFormat {
     }
 }
 
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "ls", description = "list a folder")]
+impl std::fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Parser)]
+#[command(about = "List a folder")]
 pub struct Options {
-    #[argh(positional)]
     input: String,
 
-    #[argh(switch, description = "whether to list recursively")]
+    #[arg(short = 'r', long = "recursive", help = "Whether to list recursively")]
     recursive: bool,
 
-    #[argh(switch, description = "whether to leave the output unsorted")]
+    #[arg(long = "unsorted", help = "Whether to leave the output unsorted")]
     unsorted: bool,
 
-    #[argh(
-        option,
+    #[arg(
         long = "output-format",
-        description = "specify the output format",
-        default = "Default::default()"
+        help = "Specify the output format",
+        default_value_t = Default::default(),
     )]
     output_format: OutputFormat,
 }
@@ -76,33 +90,32 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .context("failed to fetch")?;
 
     let mut children = HashSet::new();
-    if options.recursive {
-        if let Some(parent_id) = parent_id {
-            let mut stack = vec![parent_id];
-            while let Some(node_id) = stack.pop() {
-                for node in response.nodes.iter() {
-                    if !children.contains(node.parent_id.as_str()) {
-                        continue;
-                    }
-                    if !node.kind.is_dir() {
-                        continue;
-                    }
-
-                    stack.push(&node.id);
+    if options.recursive
+        && let Some(parent_id) = parent_id
+    {
+        let mut stack = vec![parent_id];
+        while let Some(node_id) = stack.pop() {
+            for node in response.nodes.iter() {
+                if !children.contains(node.parent_id.as_str()) {
+                    continue;
                 }
-                children.insert(node_id);
+                if !node.kind.is_dir() {
+                    continue;
+                }
+
+                stack.push(&node.id);
             }
+            children.insert(node_id);
         }
     }
 
     let mut entries = Vec::with_capacity(response.nodes.len());
     for node in response.nodes.iter() {
-        if let Some(parent_id) = parent_id {
-            if (options.recursive && !children.contains(node.parent_id.as_str()))
-                || (node.parent_id != parent_id)
-            {
-                continue;
-            }
+        if let Some(parent_id) = parent_id
+            && ((options.recursive && !children.contains(node.parent_id.as_str()))
+                || (node.parent_id != parent_id))
+        {
+            continue;
         }
 
         let decoded_attributes = node.decode_attributes(&parsed_url.folder_key)?;

@@ -10,7 +10,7 @@ crate-type = [ "cdylib" ]
 
 [dependencies]
 mega = { version = "0.0.0", path = "../mega", features = [ "rustls-tls", "easy" ], default-features=false }
-pyo3 = "0.25.1"
-pythonize = "0.25.0"
-serde = { version = "1.0.219", features = ["derive"] }
-tokio = { version = "1.47.1", features = [ "rt", "rt-multi-thread" ] }
+pyo3 = "0.27.2"
+pythonize = "0.27.0"
+serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.48.0", features = [ "rt", "rt-multi-thread" ] }
