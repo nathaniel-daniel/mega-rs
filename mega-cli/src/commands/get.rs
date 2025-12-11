@@ -172,6 +172,8 @@ async fn download_folder(
             let file_key = match child.key {
                 mega::FileOrFolderKey::File(key) => key,
                 mega::FileOrFolderKey::Folder(_key) => {
+                    tokio::fs::create_dir_all(&node_path).await?;
+
                     id_to_path.insert(child.id.clone(), node_path);
                     stack.push(child.id);
                     continue;
