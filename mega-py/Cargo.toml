@@ -9,8 +9,9 @@ name = "mega_py"
 crate-type = [ "cdylib" ]
 
 [dependencies]
+anyhow = "1.0.100"
 mega = { version = "0.0.0", path = "../mega", features = [ "rustls-tls", "easy" ], default-features=false }
-pyo3 = "0.27.2"
+pyo3 = { version = "0.27.2", features = [ "abi3", "abi3-py310", "anyhow" ] }
 pythonize = "0.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.48.0", features = [ "rt", "rt-multi-thread" ] }

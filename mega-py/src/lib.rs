@@ -1,3 +1,6 @@
+mod model;
+
+pub use self::model::NodeKind;
 use mega::EasyFileDownloadReader;
 use mega::FileOrFolderKey;
 use mega::FolderKey;
@@ -76,6 +79,10 @@ pub struct Node {
 
     /// The key of the parent folder
     parent_key: Option<FolderKey>,
+
+    /// The node kind
+    #[serde(rename = "type")]
+    kind: NodeKind,
 }
 
 #[pymethods]
@@ -83,6 +90,11 @@ impl Node {
     #[getter]
     pub fn key(&self) -> String {
         self.key.to_string()
+    }
+
+    #[getter]
+    pub fn get_type(&self) -> String {
+        self.kind.to_string()
     }
 
     #[getter]
@@ -107,11 +119,12 @@ impl Node {
         let public_id = DisplayPythonOptional(self.public_id.as_deref());
         let id = DisplayPythonOptional(self.id.as_deref());
         let name = &self.name;
+        let kind = self.kind.as_str();
         let key = &self.key;
         let parent_public_id = DisplayPythonOptional(self.parent_public_id.as_deref());
         let parent_key = DisplayPythonOptional(self.parent_key.as_ref());
 
-        format!("File(public_id={public_id:?}, id={id:?}, name={name:?}, parent_public_id={parent_public_id:?}, key={key:?}, parent_key={parent_key:?})")
+        format!("File(public_id={public_id:?}, id={id:?}, name={name:?}, type={kind:?}, parent_public_id={parent_public_id:?}, key={key:?}, parent_key={parent_key:?})")
     }
 }
 
@@ -132,9 +145,8 @@ pub struct FolderEntry {
     pub name: String,
 
     /// The type of node
-    #[pyo3(get, name = "type")]
     #[serde(rename = "type")]
-    pub kind: String,
+    kind: NodeKind,
 
     /// The node's key
     key: mega::FileOrFolderKey,
@@ -142,6 +154,11 @@ pub struct FolderEntry {
 
 #[pymethods]
 impl FolderEntry {
+    #[getter]
+    pub fn get_type(&self) -> &'static str {
+        self.kind.as_str()
+    }
+
     #[getter]
     pub fn key(&self) -> String {
         self.key.to_string()
@@ -164,6 +181,8 @@ impl FolderEntry {
             key: self.key.clone(),
             parent_public_id: Some(folder_url.folder_id.clone()),
             parent_key: Some(folder_url.folder_key),
+
+            kind: self.kind,
         })
     }
 
@@ -236,6 +255,9 @@ impl Client {
                     key: file_url.file_key.into(),
                     parent_public_id: None,
                     parent_key: None,
+
+                    // Assume file node.
+                    kind: NodeKind::File,
                 })
             }
             ParsedMegaUrl::Folder(folder_url) => match folder_url.child_data {
@@ -278,6 +300,8 @@ impl Client {
                         key: node_key,
                         parent_public_id: Some(folder_url.folder_id),
                         parent_key: Some(folder_url.folder_key),
+
+                        kind: node_entry.kind.try_into()?,
                     })
                 }
                 None => {
@@ -306,6 +330,8 @@ impl Client {
                         key: folder_url.folder_key.into(),
                         parent_public_id: Some(folder_url.folder_id),
                         parent_key: Some(folder_url.folder_key),
+
+                        kind: folder_entry.kind.try_into()?,
                     })
                 }
             },
@@ -397,6 +423,9 @@ impl Client {
             key: file_key.into(),
             parent_public_id: None,
             parent_key: None,
+
+            // Assume file
+            kind: NodeKind::File,
         })
     }
 
@@ -480,11 +509,7 @@ impl Client {
                 parent_id: node.parent_id,
                 name: attributes.name,
                 key,
-                kind: match node.kind {
-                    mega::FetchNodesNodeKind::File => "file".into(),
-                    mega::FetchNodesNodeKind::Directory => "folder".into(),
-                    _ => "unknown".to_string(),
-                },
+                kind: node.kind.try_into()?,
             });
         }
 

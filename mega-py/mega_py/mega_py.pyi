@@ -7,6 +7,7 @@ class Node:
     key: str
     parent_public_id: str | None
     parent_key: str | None
+    type: str
 
     def as_dict(self) -> dict[str, object]: ...
     @staticmethod
