@@ -78,7 +78,7 @@ async fn download_file(
         None => PathBuf::from(decoded_attributes.name),
     };
 
-    let temp_output = nd_util::with_push_extension(&output, "part");
+    let temp_output = output.with_added_extension("temp");
     let mut output_file = File::create(&temp_output)
         .await
         .with_context(|| format!("failed to open \"{}\"", temp_output.display()))?;
@@ -149,8 +149,10 @@ async fn download_folder(
         None => PathBuf::from(&args.root_folder_name),
     };
 
-    let temp_output = nd_util::with_push_extension(&output, "temp");
-    tokio::fs::create_dir_all(&temp_output).await?;
+    let temp_output = output.with_added_extension("temp");
+    tokio::fs::create_dir_all(&temp_output)
+        .await
+        .context("failed to create temp folder")?;
 
     let mut id_to_path = HashMap::new();
     id_to_path.insert(args.root_folder_id.clone(), temp_output.clone());
@@ -194,7 +196,9 @@ async fn download_folder(
         }
     }
 
-    tokio::fs::rename(&temp_output, &output).await?;
+    tokio::fs::rename(&temp_output, &output)
+        .await
+        .context("failed to rename temp folder")?;
 
     Ok(())
 }
