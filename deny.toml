@@ -54,7 +54,7 @@ skip = [
     # This updates a lot and takes a while for the ecosystem to update.
     { name = "windows-sys", version = "0" },
     
-    { name = "getrandom", version = "0.2.15" },
+    { name = "core-foundation", version = "0.9.4" },
 ]
 
 [sources]
