@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["DownloadType"],"fn":["download_file","download_folder","exec","parse_input_arg","path_ends_with_sep"],"struct":["DownloadFileArgs","DownloadFolderArgs","DownloadFolderArgsChild","Options"]};
