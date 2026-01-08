@@ -78,6 +78,38 @@ async fn download_file(
         None => PathBuf::from(decoded_attributes.name),
     };
 
+    if tokio::fs::try_exists(&output)
+        .await
+        .with_context(|| format!("failed to check if \"{}\" exists", output.display()))?
+    {
+        let file_key = args.file_key.clone();
+        let output = output.clone();
+        tokio::task::spawn_blocking(move || {
+            use std::fs::File;
+            use std::io::Read;
+
+            let mut validator = mega::FileValidator::new(file_key);
+            let mut buffer = vec![0; 16 * 1024];
+            let mut file = File::open(&output)?;
+            loop {
+                let n = file.read(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+                validator.feed(&buffer[..n]);
+            }
+
+            // TODO: Catch error here, display pretty error, or maybe delete?
+            validator.finish()?;
+
+            anyhow::Ok(())
+        })
+        .await??;
+
+        // If we reach here without erroring, the file was already downloaded.
+        return Ok(());
+    }
+
     let temp_output = output.with_added_extension("temp");
     let mut output_file = File::create(&temp_output)
         .await
