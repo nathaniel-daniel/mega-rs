@@ -202,7 +202,26 @@ async fn download_folder(
             .clone();
 
         for child in children.into_iter() {
-            let node_path = parent_path.join(child.name);
+            // Windows does not allow file names to end with a trailing slash,
+            // even though other platforms do.
+            // (Windows actuallly allows this through UNC paths, but this breaks the file explorer,
+            // and official documentation says not to create files with trailing spaces.)
+            //
+            // If we only sanitize on Windows, downloaded folders will be different between platforms.
+            // This can be a problem if a user downloads a file on Windows, and downloads again on another platform in the same folder.
+            // It is a desirable feature to have the same folder structure on all platforms.
+            //
+            // As a result, perform this sanitization on all platforms.
+            // TODO: Ensure sanitizing here doesn't clobber paths.
+            let child_name = {
+                let mut value = child.name.clone();
+                while value.ends_with(' ') {
+                    value.pop();
+                }
+                value
+            };
+
+            let node_path = parent_path.join(child_name);
             let file_key = match child.key {
                 mega::FileOrFolderKey::File(key) => key,
                 mega::FileOrFolderKey::Folder(_key) => {
