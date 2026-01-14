@@ -10,7 +10,7 @@ crate-type = [ "cdylib" ]
 
 [dependencies]
 anyhow = "1.0.100"
-base16ct = { version = "1.0.0", features = ["alloc"] }
+base16ct = { version = "1.0.0", features = [ "alloc" ] }
 mega = { version = "0.0.0", path = "../mega", features = [ "easy" ], default-features=false }
 pyo3 = { version = "0.27.2", features = [ "extension-module", "abi3", "abi3-py310", "anyhow" ] }
 pythonize = "0.27.0"

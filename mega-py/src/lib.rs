@@ -102,6 +102,7 @@ impl Node {
         self.parent_key.map(|key| key.to_string())
     }
 
+    /// Get the meta mac.
     pub fn meta_mac(&self) -> Option<String> {
         self.key
             .as_file_key()
@@ -170,6 +171,7 @@ impl FolderEntry {
         self.key.to_string()
     }
 
+    /// Get the meta mac.
     pub fn meta_mac(&self) -> Option<String> {
         self.key
             .as_file_key()
