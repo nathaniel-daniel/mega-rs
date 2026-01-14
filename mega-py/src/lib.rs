@@ -102,6 +102,12 @@ impl Node {
         self.parent_key.map(|key| key.to_string())
     }
 
+    pub fn meta_mac(&self) -> Option<String> {
+        self.key
+            .as_file_key()
+            .map(|key| base16ct::lower::encode_string(&key.meta_mac.to_be_bytes()))
+    }
+
     /// Serialize this as a dict.
     pub fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = pythonize(py, self)?;
@@ -162,6 +168,12 @@ impl FolderEntry {
     #[getter]
     pub fn key(&self) -> String {
         self.key.to_string()
+    }
+
+    pub fn meta_mac(&self) -> Option<String> {
+        self.key
+            .as_file_key()
+            .map(|key| base16ct::lower::encode_string(&key.meta_mac.to_be_bytes()))
     }
 
     /// Try to turn this into a Node.
