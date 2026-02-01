@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.100"
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.56", features = ["derive"] }
 clap_complete = "4.5.65"
 indicatif = { version = "0.18.3", features = [ "tokio" ] }
 mega = { version = "0.0.0", path = "../mega", features = [ "easy" ], default-features = false }
