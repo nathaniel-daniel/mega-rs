@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["generate_completions","get","ls","verify_file"]};
