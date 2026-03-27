@@ -18,7 +18,7 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "MIT",
-    "OpenSSL",
+    # "OpenSSL",
     "Unicode-3.0",
 ]
 exceptions = []
@@ -50,9 +50,11 @@ multiple-versions = "warn"
 highlight = "all"
 skip = [
     # This updates a lot and takes a while for the ecosystem to update.
-    { name = "windows-sys", version = "0" },
+    # { name = "windows-sys", version = "0" },
     
     { name = "core-foundation", version = "0.9.4" },
+    { name = "getrandom", version = "0.3.4" },
+    { name = "cpufeatures", version = "0.2.17" },
 ]
 
 [sources]
