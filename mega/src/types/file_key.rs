@@ -9,15 +9,15 @@ const BASE64_DECODE_BUFFER_LEN: usize = (BASE64_LEN * 2).div_ceil(4) * 3;
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     /// The base64 string is the wrong size
-    #[error("invalid base64 length \"{length}\", expected length \"{BASE64_LEN}\"")]
+    #[error("Invalid base64 length \"{length}\", expected length \"{BASE64_LEN}\"")]
     InvalidBase64Length { length: usize },
 
     /// An error occured while decoding base64
-    #[error("base64 decode error")]
+    #[error("Base64 decode error")]
     Base64Decode(#[from] base64::DecodeSliceError),
 
     /// The key is the wrong size
-    #[error("invalid key length \"{length}\", expected length \"{KEY_SIZE}\"")]
+    #[error("Invalid key length \"{length}\", expected length \"{KEY_SIZE}\"")]
     InvalidLength { length: usize },
 }
 

@@ -2,6 +2,7 @@ use anyhow::Context;
 use anyhow::bail;
 use clap::Parser;
 use mega::Url;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
 
@@ -69,15 +70,15 @@ struct Entry {
 }
 
 pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Result<()> {
-    let url = Url::parse(options.input.as_str()).context("invalid url")?;
+    let url = Url::parse(options.input.as_str()).context("Invalid url")?;
 
-    let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("failed to parse folder url")?;
+    let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("Failed to parse folder url")?;
     let parsed_url = parsed_url
         .as_folder_url()
-        .context("url must be a folder url")?;
+        .context("Url must be a folder url")?;
     let parent_id = match parsed_url.child_data.as_ref() {
         Some(child_data) if !child_data.is_file => Some(child_data.node_id.as_str()),
-        Some(_child_data) => bail!("cannot ls a file node"),
+        Some(_child_data) => bail!("Cannot ls a file node"),
         None => None,
     };
 
@@ -109,6 +110,8 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         }
     }
 
+    let mut key_map = HashMap::new();
+    key_map.insert(response.nodes[0].id.clone(), parsed_url.folder_key);
     let mut entries = Vec::with_capacity(response.nodes.len());
     for node in response.nodes.iter() {
         if let Some(parent_id) = parent_id
@@ -118,8 +121,12 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
             continue;
         }
 
-        let decoded_attributes = node.decode_attributes(&parsed_url.folder_key)?;
-        let key = node.decrypt_key(&parsed_url.folder_key)?;
+        let key = node.decrypt_key(&key_map)?;
+        let decoded_attributes = node.decode_attributes(&key_map)?;
+
+        if node.is_dir() {
+            key_map.insert(node.id.clone(), parsed_url.folder_key);
+        }
 
         let kind_str = match node.kind {
             mega::FetchNodesNodeKind::File => Some("file"),

@@ -12,6 +12,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pythonize::depythonize;
 use pythonize::pythonize;
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::LazyLock;
 use tokio::io::AsyncRead;
@@ -283,25 +284,30 @@ impl Client {
                                 .await
                         })
                         .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+                    let mut key_map = HashMap::new();
+                    key_map.insert(
+                        fetch_nodes_response.nodes[0].id.clone(),
+                        folder_url.folder_key,
+                    );
+
                     let node_entry = fetch_nodes_response
                         .nodes
                         .iter()
                         .find(|node| node.id == child_data.node_id)
                         .ok_or_else(|| {
-                            PyRuntimeError::new_err("missing file node in folder listing")
+                            PyRuntimeError::new_err("Missing file node in folder listing")
                         })?;
                     let node_key = node_entry
-                        .decrypt_key(&folder_url.folder_key)
+                        .decrypt_key(&key_map)
                         .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
-                    let decoded_attributes =
-                        node_entry
-                            .decode_attributes(&folder_url.folder_key)
-                            .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+                    let decoded_attributes = node_entry
+                        .decode_attributes(&key_map)
+                        .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
                     match (child_data.is_file, node_key.is_file_key()) {
-                        (true, false) => return Err(PyRuntimeError::new_err("node is not a file")),
+                        (true, false) => return Err(PyRuntimeError::new_err("Node is not a file")),
                         (false, true) => {
-                            return Err(PyRuntimeError::new_err("node is not a folder"))
+                            return Err(PyRuntimeError::new_err("Node is not a folder"))
                         }
                         _ => {}
                     }
@@ -326,6 +332,11 @@ impl Client {
                                 .await
                         })
                         .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+                    let mut key_map = HashMap::new();
+                    key_map.insert(
+                        fetch_nodes_response.nodes[0].id.clone(),
+                        folder_url.folder_key,
+                    );
 
                     let folder_entry = fetch_nodes_response
                         .nodes
@@ -333,7 +344,7 @@ impl Client {
                         .ok_or_else(|| PyRuntimeError::new_err("missing files"))?;
 
                     let decoded_attributes = folder_entry
-                        .decode_attributes(&folder_url.folder_key)
+                        .decode_attributes(&key_map)
                         .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
                     Ok(Node {
@@ -495,11 +506,11 @@ impl Client {
 
         let parent_key = node
             .parent_key
-            .ok_or_else(|| PyRuntimeError::new_err("missing parent public key"))?;
+            .ok_or_else(|| PyRuntimeError::new_err("Missing parent public key"))?;
         let public_node_id = node
             .parent_public_id
             .as_ref()
-            .ok_or_else(|| PyRuntimeError::new_err("missing parent public node id"))?;
+            .ok_or_else(|| PyRuntimeError::new_err("Missing parent public node id"))?;
 
         let fetch_nodes_response = tokio_rt
             .block_on(async {
@@ -508,14 +519,16 @@ impl Client {
                     .await
             })
             .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+        let mut key_map = HashMap::new();
+        key_map.insert(fetch_nodes_response.nodes[0].id.clone(), parent_key);
 
         let mut items = Vec::new();
         for node in fetch_nodes_response.nodes.into_iter() {
             let key = node
-                .decrypt_key(&parent_key)
+                .decrypt_key(&key_map)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
             let attributes = node
-                .decode_attributes(&parent_key)
+                .decode_attributes(&key_map)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
 
             items.push(FolderEntry {

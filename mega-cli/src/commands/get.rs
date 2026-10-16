@@ -117,7 +117,7 @@ async fn download_file(
     let mut reader = client
         .download_file(&args.file_key, download_url.as_str())
         .await
-        .context("failed to get download stream")?;
+        .context("Failed to get download stream")?;
 
     let progress_bar = indicatif::ProgressBar::new(attributes.size);
     let progress_bar_style_template = "[Time = {elapsed_precise} | ETA = {eta_precise} | Speed = {bytes_per_sec}] {wide_bar} {bytes}/{total_bytes}";
@@ -273,8 +273,8 @@ async fn parse_input_arg(
     // If it starts with a url, assume it's a url.
     // Otherwise, assume it's a raw id.
     if input.starts_with("https://mega.nz") {
-        let url = Url::parse(input).context("invalid url")?;
-        let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("failed to parse mega url")?;
+        let url = Url::parse(input).context("Invalid url")?;
+        let parsed_url = mega::ParsedMegaUrl::try_from(&url).context("Failed to parse mega url")?;
 
         match parsed_url {
             mega::ParsedMegaUrl::File(file_url) => {
@@ -287,6 +287,11 @@ async fn parse_input_arg(
                 let fetch_nodes_response = client
                     .fetch_nodes(Some(&folder_url.folder_id), true)
                     .await?;
+                let mut key_map = HashMap::new();
+                key_map.insert(
+                    fetch_nodes_response.nodes[0].id.clone(),
+                    folder_url.folder_key,
+                );
 
                 let child_data = match folder_url.child_data.as_ref() {
                     Some(child_data) => child_data,
@@ -295,20 +300,21 @@ async fn parse_input_arg(
                         let mut root_folder_name = None;
                         let mut root_folder_id = None;
                         for node_entry in fetch_nodes_response.nodes.iter() {
-                            let node_decoded_attributes =
-                                node_entry.decode_attributes(&folder_url.folder_key)?;
+                            let node_decoded_attributes = node_entry
+                                .decode_attributes(&key_map)
+                                .context("Failed to decode attributes")?;
 
                             let (root_id, _) = node_entry
                                 .key
                                 .split_once(':')
-                                .context("invalid key format")?;
+                                .context("Invalid key format")?;
                             if root_id == node_entry.id {
                                 ensure!(root_folder_name.is_none());
                                 root_folder_name = Some(node_decoded_attributes.name);
                                 root_folder_id = Some(root_id.to_string());
                                 continue;
                             }
-                            let key = node_entry.decrypt_key(&folder_url.folder_key)?;
+                            let key = node_entry.decrypt_key(&key_map)?;
 
                             children
                                 .entry(node_entry.parent_id.clone())
@@ -322,9 +328,9 @@ async fn parse_input_arg(
 
                         return Ok(DownloadType::Folder(DownloadFolderArgs {
                             root_folder_name: root_folder_name
-                                .context("missing root folder node entry")?,
+                                .context("Missing root folder node entry")?,
                             root_folder_id: root_folder_id
-                                .context("missing root folder node entry")?,
+                                .context("Missing root folder node entry")?,
                             reference_node_id: folder_url.folder_id.clone(),
                             children,
                         }));
@@ -332,18 +338,18 @@ async fn parse_input_arg(
                 };
                 ensure!(
                     child_data.is_file,
-                    "child folder downloads are currently unsupported"
+                    "Child folder downloads are currently unsupported"
                 );
 
                 let node_entry = fetch_nodes_response
                     .nodes
                     .iter()
                     .find(|node| node.id == child_data.node_id)
-                    .context("missing file node in folder listing")?;
+                    .context("Missing file node in folder listing")?;
                 let node_key = node_entry
-                    .decrypt_key(&folder_url.folder_key)?
+                    .decrypt_key(&key_map)?
                     .take_file_key()
-                    .context("folder downloads are currently unsupported")?;
+                    .context("Folder downloads are currently unsupported")?;
 
                 node_id = Some(child_data.node_id.to_string());
                 file_key = Some(node_key.clone());
@@ -353,7 +359,7 @@ async fn parse_input_arg(
         node_id = Some(input.to_string());
     };
 
-    let file_key = options_file_key.or(file_key).context("missing file key")?;
+    let file_key = options_file_key.or(file_key).context("Missing file key")?;
 
     Ok(DownloadType::File(DownloadFileArgs {
         file_key,
@@ -369,7 +375,9 @@ pub async fn exec(client: &mega::EasyClient, options: &Options) -> anyhow::Resul
         .as_deref()
         .map(|file_key| file_key.parse::<mega::FileKey>())
         .transpose()?;
-    let download_type = parse_input_arg(client, &options.input, options_file_key).await?;
+    let download_type = parse_input_arg(client, &options.input, options_file_key)
+        .await
+        .with_context(|| format!("Failed to parse input {:?}", options.input))?;
 
     match download_type {
         DownloadType::File(mut args) => {

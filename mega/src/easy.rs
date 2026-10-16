@@ -306,6 +306,7 @@ mod test {
     use super::*;
     use crate::FolderKey;
     use crate::test::*;
+    use std::collections::HashMap;
     use tokio::io::AsyncReadExt;
 
     /*
@@ -342,33 +343,35 @@ mod test {
         let response = client
             .fetch_nodes(Some(TEST_FOLDER_ID), true)
             .await
-            .expect("failed to fetch nodes");
+            .expect("Failed to fetch nodes");
+        let mut key_map = HashMap::new();
+        key_map.insert(response.nodes[0].id.clone(), folder_key);
         assert!(response.nodes.len() == 3);
         let file_attributes = response
             .nodes
             .iter()
             .find(|file| file.id == "oLkVhYqA")
-            .expect("failed to locate file")
-            .decode_attributes(&folder_key)
-            .expect("failed to decode attributes");
+            .expect("Failed to locate file")
+            .decode_attributes(&key_map)
+            .expect("Failed to decode attributes");
         assert!(file_attributes.name == "test");
 
         let file_attributes = response
             .nodes
             .iter()
             .find(|file| file.id == "kalwUahb")
-            .expect("failed to locate file")
-            .decode_attributes(&folder_key)
-            .expect("failed to decode attributes");
+            .expect("Failed to locate file")
+            .decode_attributes(&key_map)
+            .expect("Failed to decode attributes");
         assert!(file_attributes.name == "test.txt");
 
         let file_attributes = &response
             .nodes
             .iter()
             .find(|file| file.id == "IGlBlD6K")
-            .expect("failed to locate file")
-            .decode_attributes(&folder_key)
-            .expect("failed to decode attributes");
+            .expect("Failed to locate file")
+            .decode_attributes(&key_map)
+            .expect("Failed to decode attributes");
         assert!(file_attributes.name == "testfolder");
     }
 

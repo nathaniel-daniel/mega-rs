@@ -5,7 +5,7 @@ use crate::FolderKey;
 use crate::FolderKeyParseError;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use cbc::cipher::BlockDecryptMut;
+use cbc::cipher::BlockModeDecrypt;
 use cbc::cipher::KeyInit;
 use cbc::cipher::KeyIvInit;
 use std::collections::HashMap;
@@ -54,36 +54,40 @@ pub enum ResponseData {
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeAttributesError {
     /// Failed to decode base64
-    #[error(transparent)]
+    #[error("Failed to decode base64")]
     Base64Decode(#[from] base64::DecodeError),
 
     /// Decryption failed
-    #[error("failed to decrypt")]
-    Decrypt(block_padding::UnpadError),
+    #[error("Failed to decrypt")]
+    Decrypt(block_padding::Error),
 
     /// Invalid utf8
-    #[error(transparent)]
+    #[error("Invalid Utf8")]
     InvalidUtf8(#[from] std::str::Utf8Error),
 
     /// Missing the MEGA prefix
-    #[error("missing MEGA prefix")]
+    #[error("Missing MEGA prefix")]
     MissingMegaPrefix,
 
     /// Json parse error
-    #[error(transparent)]
+    #[error("Failed to parse json")]
     Json(#[from] serde_json::Error),
 
     /// Failed to parse a folder key
-    #[error("failed to parse folder key")]
+    #[error("Failed to parse folder key")]
     ParseFolderKey(#[from] FolderKeyParseError),
 
     /// A key was missing a header
-    #[error("key missing header")]
+    #[error("Key missing header")]
     KeyMissingHeader,
 
     /// The key was the wrong size
-    #[error("invalid key length '{length}'")]
+    #[error("Invalid key length {length}")]
     InvalidKeyLength { length: usize },
+
+    /// Failed to select a key.
+    #[error("Missing key")]
+    MissingKey,
 }
 
 /// File attributes
@@ -241,6 +245,10 @@ pub struct FetchNodesNode {
     #[serde(rename = "s")]
     pub size: Option<u64>,
 
+    /// The shared key
+    #[serde(rename = "sk")]
+    pub sk: Option<u64>,
+
     /// Unknown attributes
     #[serde(flatten)]
     pub unknown: HashMap<String, serde_json::Value>,
@@ -250,17 +258,26 @@ impl FetchNodesNode {
     /// Decrypt and get the key.
     pub fn decrypt_key(
         &self,
-        folder_key: &FolderKey,
+        key_map: &HashMap<String, FolderKey>,
     ) -> Result<FileOrFolderKey, DecodeAttributesError> {
-        let (_, key) = self
+        let (key, folder_key) = self
             .key
-            .split_once(':')
-            .ok_or(DecodeAttributesError::KeyMissingHeader)?;
+            .split('/')
+            .find_map(|key| {
+                let parsed = key.split_once(':');
+                let (id, key) = match parsed {
+                    Some(parsed) => parsed,
+                    None => return Some(Err(DecodeAttributesError::KeyMissingHeader)),
+                };
+                let folder_key = key_map.get(id)?;
 
+                Some(Ok((key, folder_key)))
+            })
+            .ok_or(DecodeAttributesError::MissingKey)??;
         let mut key = URL_SAFE_NO_PAD.decode(key)?;
         let cipher = Aes128EcbDec::new(&folder_key.0.to_be_bytes().into());
         let key = cipher
-            .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
+            .decrypt_padded::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
         let key_len = key.len();
         let key = if self.kind == FetchNodesNodeKind::Directory {
@@ -287,9 +304,9 @@ impl FetchNodesNode {
     /// Decode the encoded attributes.
     pub fn decode_attributes(
         &self,
-        folder_key: &FolderKey,
+        key_map: &HashMap<String, FolderKey>,
     ) -> Result<FileAttributes, DecodeAttributesError> {
-        let key = self.decrypt_key(folder_key)?;
+        let key = self.decrypt_key(key_map)?;
         decode_attributes(&self.encoded_attributes, key.key())
     }
 
@@ -313,7 +330,7 @@ fn decode_attributes(
 
     let cipher = Aes128CbcDec::new(&key.to_be_bytes().into(), &[0; 16].into());
     let decrypted = cipher
-        .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
+        .decrypt_padded::<block_padding::ZeroPadding>(&mut encoded_attributes)
         .map_err(DecodeAttributesError::Decrypt)?;
 
     let decrypted = std::str::from_utf8(decrypted)?;

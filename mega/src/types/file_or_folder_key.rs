@@ -7,15 +7,15 @@ use crate::FolderKey;
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     /// A file error
-    #[error("file key parse error")]
+    #[error("File key parse error")]
     File(#[from] super::file_key::ParseError),
 
     /// A folder error
-    #[error("folder key parse error")]
+    #[error("Folder key parse error")]
     Folder(#[from] super::folder_key::ParseError),
 
     /// Invalid key len
-    #[error("invalid key length {0}")]
+    #[error("Invalid key length {0}")]
     InvalidKeyLength(usize),
 }
 

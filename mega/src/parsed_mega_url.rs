@@ -7,10 +7,10 @@ use url::Url;
 /// An error that may occur while parsing a mega url.
 #[derive(Debug, thiserror::Error)]
 pub enum ParseMegaUrlError {
-    #[error("invalid file key")]
+    #[error("Invalid file key")]
     InvalidFileKey(#[source] FileKeyParseError),
 
-    #[error("invalid folder key")]
+    #[error("Invalid folder key")]
     InvalidFolderKey(#[source] FolderKeyParseError),
 
     #[error("{0}")]
@@ -47,28 +47,28 @@ impl TryFrom<&Url> for ParsedMegaUrl {
 
     fn try_from(url: &Url) -> Result<Self, Self::Error> {
         if url.host_str() != Some("mega.nz") {
-            return Err(ParseMegaUrlError::Generic("invalid host"));
+            return Err(ParseMegaUrlError::Generic("Invalid host"));
         }
 
         let mut path_iter = url
             .path_segments()
-            .ok_or(ParseMegaUrlError::Generic("missing path"))?;
+            .ok_or(ParseMegaUrlError::Generic("Missing path"))?;
 
         match path_iter.next() {
             Some("file") => {
                 let file_id = path_iter
                     .next()
-                    .ok_or(ParseMegaUrlError::Generic("missing file id path segment"))?;
+                    .ok_or(ParseMegaUrlError::Generic("Missing file id path segment"))?;
 
                 if path_iter.next().is_some() {
                     return Err(ParseMegaUrlError::Generic(
-                        "expected the path to end, but it continued",
+                        "Expected the path to end, but it continued",
                     ));
                 }
 
                 let file_key_raw = url
                     .fragment()
-                    .ok_or(ParseMegaUrlError::Generic("missing file key"))?;
+                    .ok_or(ParseMegaUrlError::Generic("Missing file key"))?;
                 let file_key: FileKey = file_key_raw
                     .parse()
                     .map_err(ParseMegaUrlError::InvalidFileKey)?;
@@ -81,17 +81,17 @@ impl TryFrom<&Url> for ParsedMegaUrl {
             Some("folder") => {
                 let folder_id = path_iter
                     .next()
-                    .ok_or(ParseMegaUrlError::Generic("missing folder id path segment"))?;
+                    .ok_or(ParseMegaUrlError::Generic("Missing folder id path segment"))?;
 
                 if path_iter.next().is_some() {
                     return Err(ParseMegaUrlError::Generic(
-                        "expected the path to end, but it continued",
+                        "Expected the path to end, but it continued",
                     ));
                 }
 
                 let folder_key_raw = url
                     .fragment()
-                    .ok_or(ParseMegaUrlError::Generic("missing folder key"))?;
+                    .ok_or(ParseMegaUrlError::Generic("Missing folder key"))?;
                 let (folder_key_raw, rest) = folder_key_raw
                     .split_once('/')
                     .unwrap_or((folder_key_raw, ""));
@@ -99,14 +99,14 @@ impl TryFrom<&Url> for ParsedMegaUrl {
                 let child_data = if !rest.is_empty() {
                     let (kind, node_id) = rest
                         .split_once('/')
-                        .ok_or(ParseMegaUrlError::Generic("unknown fragment format"))?;
+                        .ok_or(ParseMegaUrlError::Generic("Unknown fragment format"))?;
 
                     let is_file = match kind {
                         "file" => true,
                         "folder" => false,
                         _ => {
                             return Err(ParseMegaUrlError::Generic(
-                                "unknown fragment path segment",
+                                "Unknown fragment path segment",
                             ));
                         }
                     };
@@ -129,8 +129,8 @@ impl TryFrom<&Url> for ParsedMegaUrl {
                     child_data,
                 }))
             }
-            Some(_) => Err(ParseMegaUrlError::Generic("unknown path segment")),
-            None => Err(ParseMegaUrlError::Generic("missing path segment")),
+            Some(_) => Err(ParseMegaUrlError::Generic("Unknown path segment")),
+            None => Err(ParseMegaUrlError::Generic("Missing path segment")),
         }
     }
 }
@@ -176,8 +176,8 @@ mod test {
     fn test_parse_file_url() {
         let url = Url::parse(TEST_FILE).unwrap();
 
-        let parsed = ParsedMegaUrl::try_from(&url).expect("failed to parse url");
-        let parsed = parsed.as_file_url().expect("not a file url");
+        let parsed = ParsedMegaUrl::try_from(&url).expect("Failed to parse url");
+        let parsed = parsed.as_file_url().expect("Not a file url");
         assert!(parsed.file_id == TEST_FILE_ID);
         assert!(parsed.file_key.key == TEST_FILE_KEY_KEY_DECODED);
         assert!(parsed.file_key.iv == TEST_FILE_KEY_IV_DECODED);
@@ -188,8 +188,8 @@ mod test {
     fn test_parse_folder_url() {
         let url = Url::parse(TEST_FOLDER).unwrap();
 
-        let parsed = ParsedMegaUrl::try_from(&url).expect("failed to parse url");
-        let parsed = parsed.as_folder_url().expect("not a folder url");
+        let parsed = ParsedMegaUrl::try_from(&url).expect("Failed to parse url");
+        let parsed = parsed.as_folder_url().expect("Not a folder url");
         assert!(parsed.folder_id == "MWsm3aBL");
         assert!(parsed.folder_key.0 == TEST_FOLDER_KEY_DECODED);
         assert!(parsed.child_data.is_none());
@@ -199,11 +199,11 @@ mod test {
     fn test_parse_folder_nested_url() {
         let url = Url::parse(TEST_FOLDER_NESTED).unwrap();
 
-        let parsed = ParsedMegaUrl::try_from(&url).expect("failed to parse url");
-        let parsed = parsed.as_folder_url().expect("not a folder url");
+        let parsed = ParsedMegaUrl::try_from(&url).expect("Failed to parse url");
+        let parsed = parsed.as_folder_url().expect("Not a folder url");
         assert!(parsed.folder_id == "MWsm3aBL");
         assert!(parsed.folder_key.0 == TEST_FOLDER_KEY_DECODED);
-        let child_data = parsed.child_data.as_ref().expect("missing child data");
+        let child_data = parsed.child_data.as_ref().expect("Missing child data");
         assert!(!child_data.is_file);
         assert!(child_data.node_id == "IGlBlD6K");
     }

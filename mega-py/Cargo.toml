@@ -9,13 +9,13 @@ name = "mega_py"
 crate-type = [ "cdylib" ]
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.104"
 base16ct = { version = "1.0.0", features = [ "alloc" ] }
 mega = { version = "0.0.0", path = "../mega", features = [ "easy" ], default-features=false }
-pyo3 = { version = "0.28.2", features = [ "extension-module", "abi3", "abi3-py310", "anyhow" ] }
-pythonize = "0.28.0"
-serde = { version = "1.0.228", features = [ "derive" ] }
-tokio = { version = "1.50.0", features = [ "rt", "rt-multi-thread" ] }
+pyo3 = { version = "0.29.0", features = [ "extension-module", "abi3", "abi3-py310", "anyhow" ] }
+pythonize = "0.29.0"
+serde = { version = "1.0.229", features = [ "derive" ] }
+tokio = { version = "1.53.3", features = [ "rt", "rt-multi-thread" ] }
 
 [features]
 default = [ "native-tls" ]

@@ -1,5 +1,5 @@
 use crate::FileKey;
-use cbc::cipher::BlockEncryptMut;
+use cbc::cipher::BlockModeEncrypt;
 use cbc::cipher::KeyIvInit;
 
 type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
@@ -130,15 +130,12 @@ impl FileValidator {
         }
 
         // Split the input into blocks and process up until the last whole block.
-        let mut block_iter = input.chunks_exact(16);
-        for block in block_iter.by_ref() {
-            // The iter will always produce blocks of the right size.
-            let block = block.try_into().unwrap();
-            self.process_block(block);
+        let (block_iter, remainder) = input.as_chunks::<16>();
+        for block in block_iter {
+            self.process_block(*block);
         }
 
         // Save remaining input into the buffer.
-        let remainder = block_iter.remainder();
         let remainder_len = remainder.len();
         if remainder_len != 0 {
             self.buffer[..remainder_len].copy_from_slice(remainder);
@@ -205,7 +202,7 @@ fn create_chunk_mac(file_key: &FileKey) -> u128 {
 
 fn aes_cbc_encrypt_u128(key: u128, data: &mut [u8; 16]) {
     let mut cipher = Aes128CbcEnc::new(&key.to_be_bytes().into(), &[0; 16].into());
-    cipher.encrypt_block_mut((data).into());
+    cipher.encrypt_block((data).into());
 }
 
 /// An iterator over chunks
