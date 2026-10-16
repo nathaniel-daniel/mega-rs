@@ -47,7 +47,7 @@ impl Client {
         let id = self.sequence_id.fetch_add(1, Ordering::Relaxed) % MAX_SEQUENCE_ID;
         let mut url = Url::parse_with_params(
             "https://g.api.mega.co.nz/cs",
-            &[("id", itoa::Buffer::new().format(id))],
+            [("id", itoa::Buffer::new().format(id))],
         )?;
         {
             let mut query_pairs = url.query_pairs_mut();

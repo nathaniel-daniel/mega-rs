@@ -5,7 +5,7 @@ use crate::FolderKey;
 use crate::FolderKeyParseError;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use cbc::cipher::BlockDecryptMut;
+use cbc::cipher::BlockModeDecrypt;
 use cbc::cipher::KeyInit;
 use cbc::cipher::KeyIvInit;
 use std::collections::HashMap;
@@ -59,7 +59,7 @@ pub enum DecodeAttributesError {
 
     /// Decryption failed
     #[error("failed to decrypt")]
-    Decrypt(block_padding::UnpadError),
+    Decrypt(block_padding::Error),
 
     /// Invalid utf8
     #[error(transparent)]
@@ -260,7 +260,7 @@ impl FetchNodesNode {
         let mut key = URL_SAFE_NO_PAD.decode(key)?;
         let cipher = Aes128EcbDec::new(&folder_key.0.to_be_bytes().into());
         let key = cipher
-            .decrypt_padded_mut::<block_padding::NoPadding>(&mut key)
+            .decrypt_padded::<block_padding::NoPadding>(&mut key)
             .map_err(DecodeAttributesError::Decrypt)?;
         let key_len = key.len();
         let key = if self.kind == FetchNodesNodeKind::Directory {
@@ -313,7 +313,7 @@ fn decode_attributes(
 
     let cipher = Aes128CbcDec::new(&key.to_be_bytes().into(), &[0; 16].into());
     let decrypted = cipher
-        .decrypt_padded_mut::<block_padding::ZeroPadding>(&mut encoded_attributes)
+        .decrypt_padded::<block_padding::ZeroPadding>(&mut encoded_attributes)
         .map_err(DecodeAttributesError::Decrypt)?;
 
     let decrypted = std::str::from_utf8(decrypted)?;
