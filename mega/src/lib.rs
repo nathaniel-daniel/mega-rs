@@ -79,9 +79,9 @@ mod test {
     type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 
     pub const TEST_FILE: &str =
-        "https://mega.nz/file/7glwEQBT#Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
-    pub const TEST_FILE_KEY: &str = "Fy9cwPpCmuaVdEkW19qwBLaiMeyufB1kseqisOAxfi8";
-    pub const TEST_FILE_ID: &str = "7glwEQBT";
+        "https://mega.nz/file/FbcUiKzJ#0aUP5b2mWdMjZ_OXETued8-9sXey8EqfBIK5cucj2Ac";
+    pub const TEST_FILE_KEY: &str = "0aUP5b2mWdMjZ_OXETued8-9sXey8EqfBIK5cucj2Ac";
+    pub const TEST_FILE_ID: &str = "FbcUiKzJ";
 
     pub const TEST_FOLDER: &str = "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A";
     pub const TEST_FOLDER_KEY: &str = "xsXXTpoYEFDRQdeHPDrv7A";
@@ -91,12 +91,13 @@ mod test {
         "https://mega.nz/folder/MWsm3aBL#xsXXTpoYEFDRQdeHPDrv7A/folder/IGlBlD6K";
 
     pub const TEST_FILE_KEY_KEY_DECODED: u128 = u128::from_be_bytes([
-        161, 141, 109, 44, 84, 62, 135, 130, 36, 158, 235, 166, 55, 235, 206, 43,
+        30, 24, 190, 146, 15, 86, 19, 76, 39, 229, 74, 229, 246, 24, 70, 112,
     ]);
-    pub const TEST_FILE_KEY_IV_DECODED: u128 =
-        u128::from_be_bytes([182, 162, 49, 236, 174, 124, 29, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
+    pub const TEST_FILE_KEY_IV_DECODED: u128 = u128::from_be_bytes([
+        207, 189, 177, 119, 178, 240, 74, 159, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
     pub const TEST_FILE_META_MAC_DECODED: u64 =
-        u64::from_be_bytes([177, 234, 162, 176, 224, 49, 126, 47]);
+        u64::from_be_bytes([4, 130, 185, 114, 231, 35, 216, 7]);
     pub const TEST_FOLDER_KEY_DECODED: u128 = u128::from_be_bytes([
         198, 197, 215, 78, 154, 24, 16, 80, 209, 65, 215, 135, 60, 58, 239, 236,
     ]);
@@ -106,9 +107,24 @@ mod test {
     #[test]
     fn parse_file_key() {
         let file_key: FileKey = TEST_FILE_KEY.parse().expect("failed to parse file key");
-        assert!(file_key.key == TEST_FILE_KEY_KEY_DECODED);
-        assert!(file_key.iv == TEST_FILE_KEY_IV_DECODED);
-        assert!(file_key.meta_mac == TEST_FILE_META_MAC_DECODED);
+        assert!(
+            file_key.key == TEST_FILE_KEY_KEY_DECODED,
+            "{:?} (actual) != {:?} (expected)",
+            file_key.key.to_be_bytes(),
+            TEST_FILE_KEY_KEY_DECODED.to_be_bytes()
+        );
+        assert!(
+            file_key.iv == TEST_FILE_KEY_IV_DECODED,
+            "{:?} (actual) != {:?} (expected)",
+            file_key.iv.to_be_bytes(),
+            TEST_FILE_KEY_IV_DECODED.to_be_bytes()
+        );
+        assert!(
+            file_key.meta_mac == TEST_FILE_META_MAC_DECODED,
+            "{:?} (actual) != {:?} (expected)",
+            file_key.meta_mac.to_be_bytes(),
+            TEST_FILE_META_MAC_DECODED.to_be_bytes()
+        );
     }
 
     #[test]
