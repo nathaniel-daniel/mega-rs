@@ -9,15 +9,15 @@ const BASE64_DECODE_BUFFER_LEN: usize = (BASE64_LEN * 2).div_ceil(4) * 3;
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     /// The base64 string is the wrong size
-    #[error("invalid base64 length \"{length}\", expected length of \"{BASE64_LEN}\"")]
+    #[error("Invalid base64 length \"{length}\", expected length of \"{BASE64_LEN}\"")]
     InvalidBase64Length { length: usize },
 
     /// An error occured while decoding base64
-    #[error("base64 decode error")]
+    #[error("Base64 decode error")]
     Base64Decode(#[from] base64::DecodeSliceError),
 
     /// The key is the wrong size
-    #[error("invalid key length \"{length}\", expected length of \"{KEY_SIZE}\"")]
+    #[error("Invalid key length \"{length}\", expected length of \"{KEY_SIZE}\"")]
     InvalidLength { length: usize },
 }
 
@@ -58,8 +58,8 @@ impl std::fmt::Display for FolderKey {
         let mut buffer = [0; BASE64_LEN];
         let encoded_len = URL_SAFE_NO_PAD
             .encode_slice(self.0.to_be_bytes(), &mut buffer)
-            .expect("output buffer should never be too small");
-        let value = std::str::from_utf8(&buffer[..encoded_len]).expect("output should be utf8");
+            .expect("Output buffer should never be too small");
+        let value = std::str::from_utf8(&buffer[..encoded_len]).expect("Output should be utf8");
 
         f.write_str(value)
     }
@@ -88,7 +88,7 @@ mod test {
     fn round() {
         let folder_key = FolderKey(TEST_FOLDER_KEY_DECODED);
         let folder_key_string = folder_key.to_string();
-        let new_folder_key: FolderKey = folder_key_string.parse().expect("failed to parse");
+        let new_folder_key: FolderKey = folder_key_string.parse().expect("Failed to parse");
         assert!(folder_key.0 == new_folder_key.0);
     }
 }

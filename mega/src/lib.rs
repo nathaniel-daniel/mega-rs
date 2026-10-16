@@ -38,35 +38,35 @@ pub use url::Url;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// A reqwest Error
-    #[error("http error")]
+    #[error("Http error")]
     Reqwest(#[from] reqwest::Error),
 
     /// A Url Error
-    #[error("url error")]
+    #[error("Url error")]
     Url(#[from] url::ParseError),
 
     /// The returned number of responses did not match what was expected
-    #[error("expected \"{expected}\" responses, but got \"{actual}\"")]
+    #[error("Expected \"{expected}\" responses, but got \"{actual}\"")]
     ResponseLengthMismatch { expected: usize, actual: usize },
 
     /// There was an api error
-    #[error("api error")]
+    #[error("Api error")]
     ApiError(#[from] ErrorCode),
 
     /// Failed to decode attributes
-    #[error("failed to decode attributes")]
+    #[error("Failed to decode attributes")]
     DecodeAttributes(#[from] DecodeAttributesError),
 
     #[cfg(feature = "easy")]
-    #[error("channel closed without response")]
+    #[error("Channel closed without response")]
     NoResponse,
 
     #[cfg(feature = "easy")]
-    #[error("error occured as part of a batched send")]
+    #[error("Error occured as part of a batched send")]
     BatchSend(self::easy::ArcError<Self>),
 
     #[cfg(feature = "easy")]
-    #[error("unexpected response data type")]
+    #[error("Unexpected response data type")]
     UnexpectedResponseDataType,
 }
 

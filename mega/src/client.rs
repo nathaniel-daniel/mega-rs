@@ -104,6 +104,7 @@ mod test {
     use super::*;
     use crate::test::*;
     use crate::*;
+    use std::collections::HashMap;
 
     #[tokio::test]
     async fn execute_empty_commands() {
@@ -172,21 +173,23 @@ mod test {
         let mut response = client
             .execute_commands(&commands, Some(TEST_FOLDER_ID))
             .await
-            .expect("failed to execute commands");
+            .expect("Failed to execute commands");
         assert!(response.len() == 1);
         let response = response.swap_remove(0);
-        let response = response.into_result().expect("response was an error");
+        let response = response.into_result().expect("Response was an error");
         let response = match response {
             ResponseData::FetchNodes(response) => response,
-            _ => panic!("unexpected response"),
+            _ => panic!("Unexpected response"),
         };
+        let mut key_map = HashMap::new();
+        key_map.insert(response.nodes[0].id.clone(), folder_key);
         assert!(response.nodes.len() == 3);
         let file_attributes = response
             .nodes
             .iter()
             .find(|file| file.id == "oLkVhYqA")
             .expect("failed to locate file")
-            .decode_attributes(&folder_key)
+            .decode_attributes(&key_map)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test");
 
@@ -195,7 +198,7 @@ mod test {
             .iter()
             .find(|file| file.id == "kalwUahb")
             .expect("failed to locate file")
-            .decode_attributes(&folder_key)
+            .decode_attributes(&key_map)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "test.txt");
 
@@ -204,7 +207,7 @@ mod test {
             .iter()
             .find(|file| file.id == "IGlBlD6K")
             .expect("failed to locate file")
-            .decode_attributes(&folder_key)
+            .decode_attributes(&key_map)
             .expect("failed to decode attributes");
         assert!(file_attributes.name == "testfolder");
     }
