@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["NodeKind"],"struct":["Client","FileDownload","FolderEntry","Node"]};

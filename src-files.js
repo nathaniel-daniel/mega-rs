@@ -1,0 +1,2 @@
+createSrcSidebar('[["mega",["",[["easy",[],["reader.rs","util.rs"]],["types",[],["command.rs","error_code.rs","file_key.rs","file_or_folder_key.rs","folder_key.rs","response.rs"]]],["client.rs","easy.rs","file_validator.rs","lib.rs","parsed_mega_url.rs","types.rs"]]],["mega_cli",["",[["commands",[],["generate_completions.rs","get.rs","ls.rs","verify_file.rs"]]],["commands.rs","main.rs"]]],["mega_py",["",[["model",[],["node_kind.rs"]]],["lib.rs","model.rs"]]]]');
+//{"start":19,"fragment_lengths":[248,124,71]}
